@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: App Directory Page
+    about: For more information or to install the app, please visit the App Directory page.
+    url: https://developers.reddit.com/apps/post-explainer

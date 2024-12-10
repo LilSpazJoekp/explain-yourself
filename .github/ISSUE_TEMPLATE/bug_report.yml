@@ -1,0 +1,46 @@
+body:
+  - id: bug-description
+    attributes:
+      label: Describe the Bug
+      placeholder: A clear and concise description of what the bug is.
+    type: textarea
+    validations:
+      required: true
+  - id: desired-result
+    attributes:
+      label: Desired Result
+      placeholder: Describe the desired result.
+    type: textarea
+    validations:
+      required: true
+  - id: reddit-version
+    attributes:
+      description: What version of Reddit are you using?
+      label: Reddit Platform
+      options:
+        - Shreddit (sh.reddit.com)
+        - Mobile Web (Reddit on your mobile device's browser)
+        - iOS App
+        - Android App
+    type: dropdown
+    validations:
+      required: true
+  - id: latest-version-check
+    attributes:
+      description: |
+        Have you checked if you are using the latest version of the app?
+        If not, please update to the latest version and see if the issue persists.
+        You can update the app at https://developers.reddit.com/r/SUBREDDIT/apps/post-explainer.
+      label: I am on the latest version of the app.
+      options:
+        - label: "Yes, I am on the latest version of the app."
+          required: true
+    type: checkboxes
+  - id: anything-else
+    attributes:
+      description: Anything that will give more context about the issue you are encountering!
+      label: Links, references, and/or additional comments?
+    type: textarea
+description: File a bug report
+labels: [ "bug", "unverified" ]
+name: Bug Report

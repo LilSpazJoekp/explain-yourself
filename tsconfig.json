@@ -1,0 +1,19 @@
+{
+  "extends": "@devvit/public-api/devvit.tsconfig.json",
+  "$schema": "https://json.schemastore.org/tsconfig.json",
+  "compilerOptions": {
+    // Maximize type checking.
+//    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+//    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "strict": true
+  },
+  // https://github.com/microsoft/TypeScript/wiki/Performance#misconfigured-include-and-exclude
+  "exclude": [
+    "**/node_modules",
+    "**/.*/"
+  ]
+}
