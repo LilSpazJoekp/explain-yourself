@@ -2,6 +2,12 @@
 
 ExplainYourself is an app that allows you to require an explanation whenever a user posts in your subreddit.
 
+## Usage
+
+After installation, ExplainYourself will run in the background and automatically act on new posts. There is a post and
+subreddit context menu option to look up the associated modmail conversation where the author was asked for an
+explanation for a post.
+
 ## How it Works
 
 When a user posts to your subreddit it will do the following:
@@ -270,6 +276,10 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 [GitHub page](https://github.com/LilSpazJoekp/explain-yourself).
 
 ## Changes
+
+### 1.0.2
+
+- Add mention of modmail conversation lookup in the post and subreddit context menus to the README.
 
 ### 1.0.0
 

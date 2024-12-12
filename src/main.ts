@@ -529,7 +529,7 @@ Devvit.addTrigger({
 });
 
 Devvit.addTrigger({
-    events: ["PostDelete"],
+    event: "PostDelete",
     onEvent: handleDeletion,
 });
 
@@ -546,7 +546,7 @@ Devvit.addTrigger({
 Devvit.addMenuItem({
     forUserType: "moderator",
     label: "Lookup Post",
-    location: ["subreddit", "post"],
+    location: ["post", "subreddit"],
     onPress: lookupPostHandler,
 });
 
