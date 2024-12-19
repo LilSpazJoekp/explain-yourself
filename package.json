@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "@devvit/protos": "0.11.5-next-2024-12-10-5f4f9e655.0",
-    "@devvit/public-api": "0.11.5-next-2024-12-10-5f4f9e655.0",
+    "@devvit/protos": "0.11.5",
+    "@devvit/public-api": "0.11.5",
     "devvit": "0.11.2",
     "node-html-parser": "^6.1.13"
   },

@@ -277,6 +277,10 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+### 1.0.3
+
+- Update devvit version for vulnerability fix.
+
 ### 1.0.2
 
 - Add mention of modmail conversation lookup in the post and subreddit context menus to the README.
