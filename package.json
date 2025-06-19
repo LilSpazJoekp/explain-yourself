@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "@devvit/protos": "0.11.5",
-    "@devvit/public-api": "0.11.5",
+    "@devvit/protos": "0.11.17",
+    "@devvit/public-api": "0.11.17",
     "devvit": "0.11.2",
     "node-html-parser": "^6.1.13"
   },
@@ -10,7 +10,7 @@
     "@eslint/js": "^9.15.0",
     "eslint": "^9.15.0",
     "globals": "^15.12.0",
-    "typescript": "5.3.2",
+    "typescript": "5.8.3",
     "typescript-eslint": "^8.15.0"
   },
   "license": "BSD-3-Clause",

@@ -14,6 +14,8 @@ When a user posts to your subreddit it will do the following:
 
 - If 'Post Exclusion Regex' is set, the post will be checked against the regex pattern. If the post title and/or body
   matches the pattern, the post will be ignored.
+- If 'Post Flair List' is set, the post's flair will be checked against the set post flair IDs. If the post's flair is
+  one of these IDs, the post be ignore/processed based on 'Post Flair List Type'.
 - If 'Explanation Pending Comment' is set, a comment with the contents of 'Explanation Pending Comment' will be added to
   their post and locked it if 'Lock Explanation Comment' is enabled.
     - This is to prompt the community that OP is going to provide an explanation. This can also be used to ask the
@@ -33,6 +35,9 @@ When the user replies to the modmail with an explanation:
 - If 'Block URLs in Explanation' is enabled, the explanation will be rejected if it contains a URL.
     - If the explanation is rejected, the user will be sent a message with the contents of 'Explanation Invalid Message
       Body'.
+- If 'Require URL in Explanation' is enabled, the explanation must contain a URL.
+    - If the explanation does not contain a URL, the user will be sent a message with the contents of 'Explanation
+      Invalid Message Body'.
 - If the explanation is valid, the user will be sent a message with the contents of 'Explanation Accepted Message Body'.
     - A comment will be posted on the user's post with the contents of 'Explanation Accepted Comment' and locked it if
       'Lock Explanation Comment' is enabled.
@@ -123,6 +128,15 @@ page: https://developers.reddit.com/r/<SUBREDDIT>/post-explainer
 - **Post Exclusion Type**: The type of content to apply the exclusion regex to. Options are 'Title' or 'Body', multiple
   can be selected.
 
+#### Flair Settings
+
+- **Post Flair List**: Post flair IDs to check against. If the post's flair is one of these IDs, the post will be
+  ignored/processed based on 'Post Flair List Type'. Post flair IDs can be found here (replace SUBREDDIT with your
+  subreddit): https://www.reddit.com/mod/SUBREDDIT/postflair and hovering your mouse over/tapping the desired flair and
+  clicking 'Copy ID'.
+- **Post Flair List Type**: The type of action to take if the post flair matches. Options are 'Inclusion' or '
+  Exclusion'.
+
 #### Action Settings
 
 - **Comment Minimum Age**: Minimum duration before the comment score is checked. Set to 0 to disable. Maximum: 1440 (24
@@ -174,6 +188,8 @@ The following settings are ignored if 'Allow Explanation' is disabled.
 - **Lock Explanation Comment**: If enabled, locks the comment the app makes on the post.
 - **Block URLs in Explanation**: If enabled, if the explanation provided by the author contains a URL, the explanation
   will be rejected.
+- **Require URL in Explanation**: If enabled, the author must provide a URL in their explanation. If the explanation
+  does not contain a URL, it will be rejected.
 - **Explanation Minimum Length**: Minimum length required for the author's explanation. Only counts alphanumeric
   characters. Set to 0 to disable.
 - **Spoiler Explanation**: If enabled, the explanation provided by the author will be marked as a spoiler. Ignored if
@@ -238,8 +254,7 @@ Most Moderator Toolbox placeholders are also supported.
     - Example: `https://www.reddit.com/r/pics/comments/haucpf/ive_found_a_few_funny_memories_during_lockdown/`
 
 **Note:** If you use a placeholder in a field that does not support it, the placeholder will not be filled in and will
-be
-displayed as is.
+be displayed as is.
 
 ## Score Requirement Configuration
 
@@ -276,6 +291,18 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 [GitHub page](https://github.com/LilSpazJoekp/explain-yourself).
 
 ## Changes
+
+### 1.1.0
+
+- Make RegEx pattern matching case-insensitive.
+- Add ability to require a URL in the explanation.
+- Add ability to exclude/exclude posts based on post flair ID.
+
+### 1.0.4
+
+- Update devvit version.
+- Attempt to archive the modmail conversation when the user is asked for an explanation.
+- Ignore messages that are not from the post author when checking for explanations.
 
 ### 1.0.3
 

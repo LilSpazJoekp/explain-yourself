@@ -32,6 +32,14 @@ export async function handleMessage(
         context,
         conversationId,
     );
+    if (event.messageAuthor.name !== postData?.author) {
+        log.info(
+            "Post data author (%s) does not match message author (%s), ignoring",
+            postData?.author,
+            event.messageAuthor.name,
+        );
+        return;
+    }
     if (postData === undefined) {
         log.error("No post data found for message");
         return;
@@ -57,15 +65,17 @@ export async function handleMessage(
     }
     const {
         blockUrlsInExplanation,
+        lateReplyDuration,
         messageRequiredLength,
         replyDuration,
-        lateReplyDuration,
+        requireUrlInExplanation,
     } = await resolveSettings(
         settings,
         "blockUrlsInExplanation",
+        "lateReplyDuration",
         "messageRequiredLength",
         "replyDuration",
-        "lateReplyDuration",
+        "requireUrlInExplanation",
     );
     const now = new Date().valueOf();
     const lateReply = replyDuration > 0 && postData.olderThan(replyDuration, now);
@@ -96,6 +106,11 @@ export async function handleMessage(
     const aTags = parsedHtml.querySelectorAll("a");
     if (blockUrlsInExplanation && (aTags.length > 0 || body.match(URL_REGEX))) {
         log.info("Author included one or more URLs, rejecting message");
+        await postData.respond({ responseType: ResponseType.Invalid });
+        return;
+    }
+    if (requireUrlInExplanation && aTags.length === 0 && !body.match(URL_REGEX)) {
+        log.info("Author did not include a URL, rejecting message");
         await postData.respond({ responseType: ResponseType.Invalid });
         return;
     }

@@ -299,6 +299,7 @@ export class PostData {
             "removalScoreRatioBase",
             "removalScoreRatioOffset",
         );
+        await this.#injectLogArgs();
         let score = staticRemovalScore;
         if (useScoreRatio) {
             score = Math.floor(
@@ -423,6 +424,13 @@ export class PostData {
             );
             this.sentModmailId = conversationData.conversation.id as string;
             await this.writeToRedis();
+        }
+        try {
+            await reddit.modMail.archiveConversation(
+                conversationData.conversation.id as string,
+            );
+        } catch (error) {
+            this.log.error("Failed to archive conversation", error);
         }
     }
 

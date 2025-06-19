@@ -23,13 +23,20 @@ export async function handlePost(
         event.post.title,
     );
     log.info("Handling post");
-    const { exclusionRegex, exclusionTypes } = await resolveSettings(
+    const {
+        exclusionRegex,
+        exclusionTypes,
+        postFlairIdsList,
+        postFlairIdsListType,
+    } = await resolveSettings(
         settings,
         "exclusionRegex",
         "exclusionTypes",
+        "postFlairIdsList",
+        "postFlairIdsListType",
     );
     if (exclusionRegex) {
-        const regex = new RegExp(exclusionRegex);
+        const regex = new RegExp(exclusionRegex, "i");
         const toCheck = [];
         if (exclusionTypes) {
             if (exclusionTypes.includes("title")) {
@@ -42,6 +49,23 @@ export async function handlePost(
         if (toCheck.some((text) => regex.test(text))) {
             log.info("Post excluded by regex");
             return;
+        }
+    }
+
+    if (postFlairIdsList) {
+        const flairIds = postFlairIdsList.split("\n");
+        const postFlairExclusion: boolean = postFlairIdsListType[0] === "exclusion";
+        const postFlairId = post.flair?.templateId || "";
+        if (postFlairExclusion) {
+            if (flairIds.includes(postFlairId)) {
+                log.info("Post excluded by flair");
+                return;
+            }
+        } else {
+            if (!flairIds.includes(postFlairId)) {
+                log.info("Post does not have the required flair");
+                return;
+            }
         }
     }
 

@@ -213,8 +213,73 @@ Devvit.addSettings([
                     },
                 ],
                 helpText:
-                    "Post exclusion settings. If the post matches the exclusion regex, the app will not take any actions on it.",
-                label: "Post Exclusion Settings",
+                    "Post RegEx exclusion settings. If the post matches the exclusion RegEx, the app will not take any actions on it.",
+                label: "Post RegEx Exclusion Settings",
+                type: "group",
+            },
+
+            {
+                fields: [
+                    {
+                        ...textField({
+                            blankIsDisabled: true,
+                            fieldType: "paragraph",
+                            helpText:
+                                "Post flair IDs to check against. If the post's flair is one of these IDs, the post will be ignored/processed based on 'Post Flair List Type'. One flair ID per line.",
+                            label: "Post Flair List",
+                            name: "postFlairIds",
+                        }),
+                    },
+                    {
+                        defaultValue: ["exclusion"],
+                        helpText: "If set to 'Exclusion', the post will be ignored if the post's flair ID is in the list. If set to 'Inclusion', the post will be processed if the post's flair ID is in the list.",
+                        label: "Post Flair List Type",
+                        multiSelect: false,
+                        name: "postFlairListType",
+                        options: [
+                            {
+                                label: "Exclusion",
+                                value: "exclusion",
+                            },
+                            {
+                                label: "Inclusion",
+                                value: "inclusion",
+                            },
+                        ],
+                        type: "select",
+                    },
+                    // {
+                    //     ...textField({
+                    //         blankIsDisabled: true,
+                    //         fieldType: "paragraph",
+                    //         helpText:
+                    //             "User flair IDs to check against. If the user's flair is one of these IDs, the post will be ignored/processed based on 'User Flair List Type'. One flair ID per line.",
+                    //         label: "User Flair List",
+                    //         name: "userFlairIds",
+                    //     }),
+                    // },
+                    // {
+                    //     defaultValue: ["exclusion"],
+                    //     helpText: "If set to 'Exclusion', the post will be ignored if the user's flair ID is in the list. If set to 'Inclusion', the post will be processed if the user's flair ID is in the list.",
+                    //     label: "User Flair List Type",
+                    //     multiSelect: false,
+                    //     name: "userFlairListType",
+                    //     options: [
+                    //         {
+                    //             label: "Exclusion",
+                    //             value: "exclusion",
+                    //         },
+                    //         {
+                    //             label: "Inclusion",
+                    //             value: "inclusion",
+                    //         },
+                    //     ],
+                    //     type: "select",
+                    // },
+                ],
+                helpText:
+                    "Flair settings. Depending on the list type, the post will be ignored or processed based on the post's flair ID.",
+                label: "Flair Settings",
                 type: "group",
             },
         ],
@@ -396,12 +461,13 @@ Devvit.addSettings([
                         ...textField({
                             blankIsDisabled: true,
                             helpText:
-                                "Message sent to the author when their explanation is invalid. Sent when the explanation contains a URL .",
+                                "Message sent to the author when their explanation is invalid. Sent when the explanation contains a URL when prohibited and the inverse if required.",
                             label: "Explanation Invalid Message Body",
                             name: "explanationInvalidMessageBody",
                             parentActions: [
                                 "Allow Explanation",
                                 "Block URLs in Explanation",
+                                "Require URLs in Explanation",
                             ],
                         }),
                     },
@@ -473,6 +539,15 @@ Devvit.addSettings([
                 ...booleanField({
                     name: "blockUrlsInExplanation",
                     label: "Block URLs in Explanation",
+                }),
+            },
+            {
+                defaultValue: false,
+                helpText:
+                    "If enabled, if the explanation provided by the author does not contain a URL, the explanation will be rejected. Ignored if 'Block URLs in Explanation' is enabled.",
+                ...booleanField({
+                    name: "requireUrlInExplanation",
+                    label: "Require URLs in Explanation",
                 }),
             },
             {

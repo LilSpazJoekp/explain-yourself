@@ -24,6 +24,8 @@ export interface ExplainYourselfSettings {
     messageRequiredLength: number;
     messageSubject: string;
     postApproveScore: number;
+    postFlairIdsList: string;
+    postFlairIdsListType: string[]
     postMarkedSafeCommentHeader: string;
     postRemovalCommentHeader: string;
     postSafeScore: number;
@@ -34,6 +36,7 @@ export interface ExplainYourselfSettings {
     replyDuration: number;
     reportReason: string;
     reportWithCommentScore: boolean;
+    requireUrlInExplanation: boolean;
     spoilerExplanation: boolean;
     useScoreRatio: boolean;
 }
