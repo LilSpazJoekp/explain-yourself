@@ -112,7 +112,6 @@ export async function handleDeletion(
         log.info("Handling deletion");
         const postData = await PostData.fromPost(context, post);
         await postData.markDeleted();
-        await postData.setCategory(PostCategory.Deleted);
     } else {
         log.info("Ignoring non-user deletion");
     }

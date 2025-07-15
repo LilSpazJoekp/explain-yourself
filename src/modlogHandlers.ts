@@ -97,7 +97,7 @@ async function handleApprove(
         event.moderator?.name,
         event.action?.includes("link") ? event.targetPost?.id : event.targetComment?.id,
     );
-    await postData.markSafe();
+    await postData.markApproved();
     log.info("Marked Safe");
 }
 

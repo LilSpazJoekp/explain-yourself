@@ -292,6 +292,12 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+### 1.1.3
+
+- Update devvit version.
+- Add post ID to message subject so each new post has a unique conversation.
+- Add private note logging to the modmail conversation when specific events occur.
+
 ### 1.1.0
 
 - Make RegEx pattern matching case-insensitive.

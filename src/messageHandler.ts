@@ -125,6 +125,7 @@ export async function handleMessage(
             if (comment === undefined) {
                 log.error("Failed to comment");
                 await postData.respond({ responseType: ResponseType.Error });
+                await reddit.modMail.archiveConversation(conversationId);
                 return;
             }
             await postData.respond({ responseType: ResponseType.Accepted });

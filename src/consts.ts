@@ -12,3 +12,11 @@ export const WATCHED_MODLOG_ACTIONS = [
     "removelink",
     "spamlink",
 ];
+
+export enum PrivateNote {
+    Approved = "The post/comment was approved by a moderator. This can include approvals performed by the bot itself.",
+    Deleted = "The post was deleted by the author.",
+    Removed = "The post/comment was removed by a moderator. This can include removals for the following reasons:\n\n- a moderator (other than this bot) removed the post/comment\n- this bot removed the post for failing to meet defined requirements\n- author failed to respond with an explanation within the required time\n- spam",
+    Safe = "The post has marked as safe. It will no longer be monitored.",
+    NoResponse = "The explanation request was not responded to by the author.",
+}

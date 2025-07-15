@@ -6,7 +6,7 @@ import {
     ScheduledJobEvent,
 } from "@devvit/public-api";
 import { CommentType, PostCategory } from "./_types.js";
-import { CHECK_CRON, JOBS } from "./consts.js";
+import { CHECK_CRON, JOBS, PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
 import { resolveSettings } from "./utils.js";
@@ -138,7 +138,7 @@ export async function checkComments(
                 toApprove.map(async (postData) => {
                     log.info("Approving post %s and setting as safe", postData.postId);
                     await postData.post.approve();
-                    await postData.markSafe();
+                    await postData.markApproved();
                     await postData.commentReply(CommentType.Safe);
                 }),
             )
@@ -222,7 +222,7 @@ export async function checkPosts(
         toApprove.map(async (postData) => {
             log.info("Approving post %s and setting as safe", postData.postId);
             await postData.post.approve();
-            await postData.markSafe();
+            await postData.markApproved();
             await postData.commentReply(CommentType.Safe);
         }),
     );
@@ -260,8 +260,10 @@ export async function checkResponses(
                     log.info("Author did not reply in allotted time, removing post");
                     await postData.commentReply(CommentType.Removed);
                     await postData.setCategory(PostCategory.Removed);
+                    await postData.leavePrivateModNote(PrivateNote.Removed);
                 } else {
                     await postData.setCategory(PostCategory.NoResponse);
+                    await postData.leavePrivateModNote(PrivateNote.NoResponse);
                 }
             }),
     );
@@ -282,6 +284,7 @@ export async function checkResponses(
                 await reddit.remove(postData.postId, false);
                 await postData.commentReply(CommentType.Removed);
                 await postData.setCategory(PostCategory.Removed);
+                await postData.leavePrivateModNote(PrivateNote.Removed);
             }),
     );
 }

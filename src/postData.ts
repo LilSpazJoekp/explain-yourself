@@ -1,5 +1,6 @@
 import { Comment, Context, JobContext, Post, TriggerContext } from "@devvit/public-api";
 import { CommentType, PlaceholderField, PostCategory, ResponseType } from "./_types.js";
+import { PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { humanDuration, resolveSetting, resolveSettings } from "./utils.js";
 
@@ -258,15 +259,35 @@ export class PostData {
         return results.members.length > 0;
     }
 
+    async leavePrivateModNote(noteType: PrivateNote): Promise<void> {
+        await this.context.reddit.modMail.reply({
+            conversationId: this.sentModmailId,
+            body: noteType.valueOf(),
+            isInternal: true,
+        });
+        await this.context.reddit.modMail.archiveConversation(this.sentModmailId);
+    }
+
+    async markApproved(): Promise<void> {
+        this.safe = true;
+        await this.setCategory(PostCategory.Safe);
+        await this.commentReply(CommentType.Safe);
+        await this.writeToRedis();
+        await this.leavePrivateModNote(PrivateNote.Approved);
+    }
+
     async markDeleted(): Promise<void> {
         this.deleted = true;
+        await this.setCategory(PostCategory.Deleted);
         await this.writeToRedis();
+        await this.leavePrivateModNote(PrivateNote.Deleted);
     }
 
     async markRemoved(): Promise<void> {
         this.removed = true;
         await this.setCategory(PostCategory.Removed);
         await this.writeToRedis();
+        await this.leavePrivateModNote(PrivateNote.Removed);
     }
 
     async markSafe(): Promise<void> {
@@ -274,6 +295,7 @@ export class PostData {
         await this.setCategory(PostCategory.Safe);
         await this.commentReply(CommentType.Safe);
         await this.writeToRedis();
+        await this.leavePrivateModNote(PrivateNote.Safe);
     }
 
     olderThan(minutes: number, now: number | undefined = undefined): boolean {
@@ -406,9 +428,12 @@ export class PostData {
 
     async sendMessage(post: Post): Promise<void> {
         const { reddit, subredditName } = this.context;
-        const subject = (
-            await this.#replacePlaceholders(PlaceholderField.messageSubject)
-        ).slice(0, 100);
+        const subject =
+            `[${post.id}]: ` +
+            (await this.#replacePlaceholders(PlaceholderField.messageSubject)).slice(
+                0,
+                100,
+            );
         const body = await this.#replacePlaceholders(PlaceholderField.messageBody);
         const conversationData = await reddit.modMail.createConversation({
             body: body,
