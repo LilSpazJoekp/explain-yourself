@@ -10,7 +10,7 @@ explanation for a post.
 
 ## How it Works
 
-When a user posts to your subreddit it will do the following:
+When a user posts to your subreddit, it will do the following:
 
 - If 'Post Exclusion Regex' is set, the post will be checked against the regex pattern. If the post title and/or body
   matches the pattern, the post will be ignored.
@@ -25,6 +25,7 @@ When a user posts to your subreddit it will do the following:
       reply within that time, the post will be removed.
     - If 'Late Reply Duration' is set, the user has that amount of time to reply with an explanation after the post has
       been removed for exceeding the 'Reply Duration'. If the user replies within that time, the post will be approved.
+    - The modmail conversation will be archived.
 
 When the user replies to the modmail with an explanation:
 
@@ -43,8 +44,9 @@ When the user replies to the modmail with an explanation:
       'Lock Explanation Comment' is enabled.
 - If an explanation is received after an explanation has already been accepted, the user will be sent a message with the
   contents of 'Explanation Already Accepted Message Body'.
-- if the explanation is received after the 'Late Reply Duration' has passed, the user will be sent a message with the
+- If the explanation is received after the 'Late Reply Duration' has passed, the user will be sent a message with the
   contents of 'Explanation Too Late Message Body'.
+- The modmail conversation will be archived.
 
 After the comment has been added to the user's post:
 
@@ -65,7 +67,7 @@ After the comment has been added to the user's post:
     - If 'Mark Safe With Post Score' is enabled, the post will be marked as safe if the post score is above the
       specified threshold.
 - After the duration set in 'Comment Maximum Age' has passed:
-    - The post will be marked as safe and the comment score will no longer be checked.
+    - The post will be marked as safe, and the comment score will no longer be checked.
 
 After the post has been marked as safe:
 
@@ -113,7 +115,7 @@ page: https://developers.reddit.com/r/<SUBREDDIT>/post-explainer
 
 #### Approval Settings
 
-- **Approve With Comment Score**: If enabled, allows the post to be approved if the comment score is goes above the
+- **Approve With Comment Score**: If enabled, allows the post to be approved if the comment score goes above the
   specified threshold.
 - **Comment Approval Score**: Comment score at which the post is approved. Must be higher than 1 otherwise the post will
   be approved immediately. Ignored if 'Approve With Comment Score' is disabled.
@@ -164,8 +166,9 @@ page: https://developers.reddit.com/r/<SUBREDDIT>/post-explainer
 
 The following settings are ignored if 'Allow Explanation' is disabled.
 
-- **Message Subject**: The subject of the message sent to the author. Be mindful of the maximum length. Any text
-  exceeding the max length will be cut off. Max length is 100.
+- **Message Subject**: The subject of the message sent to the author. This will be prefixed with the post ID (e.g.,
+  `[t3_1a2b3c]: `). Be mindful of the maximum length. Any text exceeding the max length will be cut off. Max length
+  is 100.
 - **Message Body**: Message sent to the author asking for a post explanation.
 - **Explanation Accepted Message Body**: Message sent to the author when their explanation is accepted.
 - **Explanation Already Accepted Message Body**: Message sent to the author when their explanation is already accepted.
@@ -193,7 +196,7 @@ The following settings are ignored if 'Allow Explanation' is disabled.
 - **Explanation Minimum Length**: Minimum length required for the author's explanation. Only counts alphanumeric
   characters. Set to 0 to disable.
 - **Spoiler Explanation**: If enabled, the explanation provided by the author will be marked as a spoiler. Ignored if
-  'Allow Explanation' is disabled. If disabled the explanation will be a in a quote block.
+  'Allow Explanation' is disabled. If disabled, the explanation will be in a quote block.
 
 ### Placeholders
 
@@ -222,18 +225,18 @@ Most Moderator Toolbox placeholders are also supported.
       Body' response text.
     - Example: `https://www.reddit.com/r/pics/comments/haucpf/comment/fv6ejit/`
 - `{explanation}`
-    - The location for the explanation from the user to filled in. Only usable and required in the 'Explanation Accepted
+    - The location for the explanation from the user to fill in. Only usable and required in the 'Explanation Accepted
       Comment' response text.
     - Example: `This is from my 1st tour in 89, backstage in Vegas. I figured you all would enjoy it.`
 - `{lateReplyDuration}`
-    - The late reply duration converted from minutes to a human-readable duration. For example if 'Late Reply Duration'
+    - The late reply duration converted from minutes to a human-readable duration. For example, if 'Late Reply Duration'
       is set to `70` then this will be filled in as "1 hour 10 minutes".
     - Example: `1 hour 10 minutes`
 - `{link}`
     - The destination link of the post.
     - Example: `https://i.redd.it/f58v4g8mwh551.jpg`
 - `{replyDuration}`
-    - The reply duration converted from minutes to a human-readable duration. For example if 'Reply Duration' is set to
+    - The reply duration converted from minutes to a human-readable duration. For example, if 'Reply Duration' is set to
       `10` then this will be filled in as "10 minutes".
     - Example: `10 minutes`
 - `{replyLength}`
@@ -292,17 +295,25 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+### 1.1.4
+
+- Fix an issue where if the author replies to the modmail conversation after their explanation has been accepted, they
+  would not be sent the message with the contents of 'Explanation Already Accepted Message Body'.
+- Fix an issue where modmail conversations were not being auto-archived.
+- Fix an issue where some settings were set to invalid default values.
+
 ### 1.1.3
 
 - Update devvit version.
-- Add post ID to message subject so each new post has a unique conversation.
+- Add post ID to the message subject so each new post has a unique conversation. This is to prevent the same
+  conversation from being reused for different posts.
 - Add private note logging to the modmail conversation when specific events occur.
 
 ### 1.1.0
 
 - Make RegEx pattern matching case-insensitive.
-- Add ability to require a URL in the explanation.
-- Add ability to exclude/exclude posts based on post flair ID.
+- Add the ability to require a URL in the explanation.
+- Add the ability to exclude/exclude posts based on post flair ID.
 
 ### 1.0.4
 

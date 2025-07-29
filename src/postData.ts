@@ -61,13 +61,13 @@ export class PostData {
         this.context = context;
         this.createdAt = 0;
         this.deleted = false;
+        this.log = logger;
         this.post = null;
         this.postId = "";
         this.removed = false;
         this.responseMessageId = "";
         this.safe = false;
         this.sentModmailId = "";
-        this.log = logger;
     }
 
     static async fetchFromCategory(
@@ -79,7 +79,7 @@ export class PostData {
         const { redis } = context;
         const results = await redis.zScan(`posts:${category}`, 0);
         if ((await context.settings.get("debugMode")) == "true") {
-            // WHY ARE BOOLEAN SETTINGS RETURNED AS STRINGS!
+            // WHY ARE BOOLEAN SETTINGS RETURNED AS STRINGS!?
             console.log(category, results);
         }
         return (
@@ -416,6 +416,7 @@ export class PostData {
             body,
             isAuthorHidden: true,
         });
+        await this.context.reddit.modMail.archiveConversation(this.sentModmailId);
     }
 
     async savePost(category: PostCategory): Promise<void> {
@@ -428,11 +429,12 @@ export class PostData {
 
     async sendMessage(post: Post): Promise<void> {
         const { reddit, subredditName } = this.context;
+        const postIdPrefix = `[${post.id}]: `;
         const subject =
-            `[${post.id}]: ` +
+            postIdPrefix +
             (await this.#replacePlaceholders(PlaceholderField.messageSubject)).slice(
                 0,
-                100,
+                100 - postIdPrefix.length,
             );
         const body = await this.#replacePlaceholders(PlaceholderField.messageBody);
         const conversationData = await reddit.modMail.createConversation({
@@ -550,7 +552,7 @@ export class PostData {
             "replyDuration",
             "lateReplyDuration",
         );
-        let text = await resolveSetting(this.context.settings, field);
+        let text = (await resolveSetting(this.context.settings, field)) || "";
         text = text.replace(/\{subreddit}/g, this.post.subredditName);
         text = text.replace(/\{author}/g, this.post.authorName);
         text = text.replace(/\{title}/g, this.post.title);

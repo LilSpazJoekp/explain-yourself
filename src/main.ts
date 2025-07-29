@@ -49,7 +49,7 @@ Devvit.addSettings([
                     },
                     {
                         helpText:
-                            "Comment score at which the post is removed. Must be less than 1 otherwise the post will be removed immediately. Required if 'Remove Post' is enabled. Ignored if 'Use Score Ratio' is enabled.",
+                            "Comment score at which the post is removed. Must be less than 1 otherwise the post will be removed immediately. Required if 'Remove With Comment Score' or 'Report With Comment Score' is enabled. Ignored if 'Use Score Ratio' is enabled.",
                         ...numberField({
                             label: "Removal Score",
                             name: "removalScore",
@@ -101,6 +101,7 @@ Devvit.addSettings([
                         }),
                     },
                     {
+                        defaultValue: 2,
                         helpText:
                             "Comment score at which the post is marked as safe. Must be higher than 1 otherwise the post will be marked as safe immediately. Ignored if 'Mark Safe With Comment Score' is disabled.",
                         ...numberField({
@@ -120,6 +121,7 @@ Devvit.addSettings([
                         }),
                     },
                     {
+                        defaultValue: 2,
                         helpText:
                             "Post score at which the post is marked as safe. Must be higher than 1 otherwise the post will be marked as safe immediately. Ignored if 'Mark Safe With Post Score' is disabled.",
                         ...numberField({
@@ -146,6 +148,7 @@ Devvit.addSettings([
                         }),
                     },
                     {
+                        defaultValue: 2,
                         helpText:
                             "Comment score at which the post is approved. Must be higher than 1 otherwise the post will be approved immediately. Ignored if 'Approve With Comment Score' is disabled.",
                         ...numberField({
@@ -165,6 +168,7 @@ Devvit.addSettings([
                         }),
                     },
                     {
+                        defaultValue: 2,
                         helpText:
                             "Post score at which the post is approved. Must be higher than 1 otherwise the post will be approved immediately. Ignored if 'Approve With Post Score' is disabled.",
                         ...numberField({
@@ -232,7 +236,8 @@ Devvit.addSettings([
                     },
                     {
                         defaultValue: ["exclusion"],
-                        helpText: "If set to 'Exclusion', the post will be ignored if the post's flair ID is in the list. If set to 'Inclusion', the post will be processed if the post's flair ID is in the list.",
+                        helpText:
+                            "If set to 'Exclusion', the post will be ignored if the post's flair ID is in the list. If set to 'Inclusion', the post will be processed if the post's flair ID is in the list.",
                         label: "Post Flair List Type",
                         multiSelect: false,
                         name: "postFlairListType",
@@ -537,8 +542,8 @@ Devvit.addSettings([
                 helpText:
                     "If enabled, if the explanation provided by the author contains a URL, the explanation will be rejected.",
                 ...booleanField({
-                    name: "blockUrlsInExplanation",
                     label: "Block URLs in Explanation",
+                    name: "blockUrlsInExplanation",
                 }),
             },
             {
@@ -546,8 +551,8 @@ Devvit.addSettings([
                 helpText:
                     "If enabled, if the explanation provided by the author does not contain a URL, the explanation will be rejected. Ignored if 'Block URLs in Explanation' is enabled.",
                 ...booleanField({
-                    name: "requireUrlInExplanation",
                     label: "Require URLs in Explanation",
+                    name: "requireUrlInExplanation",
                 }),
             },
             {
@@ -565,8 +570,8 @@ Devvit.addSettings([
                 helpText:
                     "If enabled, the explanation provided by the author will be marked as a spoiler. Ignored if 'Allow Explanation' is disabled.",
                 ...booleanField({
-                    name: "spoilerExplanation",
                     label: "Spoiler Explanation",
+                    name: "spoilerExplanation",
                 }),
             },
         ],
@@ -619,8 +624,9 @@ Devvit.addTrigger({
 });
 
 Devvit.addMenuItem({
+    description: "Lookup the modmail thread where the author provided their explanation.",
     forUserType: "moderator",
-    label: "Lookup Post",
+    label: "Lookup Explanation Modmail",
     location: ["post", "subreddit"],
     onPress: lookupPostHandler,
 });

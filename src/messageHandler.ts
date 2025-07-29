@@ -45,6 +45,11 @@ export async function handleMessage(
         return;
     }
     if (postData.responseMessageId !== "") {
+        log.info(
+            "Post already has a response message (%s), ignoring",
+            postData.responseMessageId,
+        );
+        await postData.respond({ responseType: ResponseType.AlreadyAccepted });
         return;
     }
     const post = await reddit.getPostById(postData.postId);
@@ -56,11 +61,13 @@ export async function handleMessage(
     const message = messages[messageId];
     if (message === undefined) {
         log.error("No message found");
+        await postData.respond({ responseType: ResponseType.Error });
         return;
     }
     const { body: bodyHtml, bodyMarkdown: body } = message;
     if (body === undefined || bodyHtml === undefined) {
         log.error("No body found");
+        await postData.respond({ responseType: ResponseType.Error });
         return;
     }
     const {
@@ -83,12 +90,12 @@ export async function handleMessage(
     const status = lateReply ? (tooLateReply ? "too late" : "late") : "on-time";
     log.info("Received %s reply (%s): %s", status, postData.humanAge(), body);
     if (tooLateReply) {
-        await postData.respond({ responseType: ResponseType.TooLate });
         log.info(
             "Reply too late (%s > %s)",
             postData.humanAge(),
             humanDuration(lateReplyDuration),
         );
+        await postData.respond({ responseType: ResponseType.TooLate });
         return;
     }
     if (lateReply) {
@@ -101,6 +108,7 @@ export async function handleMessage(
     const parsedHtml = parse(bodyHtml);
     if (parsedHtml === undefined) {
         log.error("Failed to parse HTML");
+        await postData.respond({ responseType: ResponseType.Error });
         return;
     }
     const aTags = parsedHtml.querySelectorAll("a");
@@ -125,7 +133,6 @@ export async function handleMessage(
             if (comment === undefined) {
                 log.error("Failed to comment");
                 await postData.respond({ responseType: ResponseType.Error });
-                await reddit.modMail.archiveConversation(conversationId);
                 return;
             }
             await postData.respond({ responseType: ResponseType.Accepted });
@@ -136,7 +143,10 @@ export async function handleMessage(
             }
             await postData.setCategory(PostCategory.Active);
         } else {
-            log.error(`Post not in pending response category`);
+            log.error(
+                `Post not in pending response category or in no response category and eligible for response`,
+            );
+            await postData.respond({ responseType: ResponseType.Error });
         }
     } else {
         log.info(
