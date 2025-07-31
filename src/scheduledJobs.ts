@@ -165,8 +165,10 @@ export async function checkPosts(
     context: JobContext,
 ) {
     const log = logger.injectArgs("checkPosts");
-    log.info("Checking active posts");
     const { settings } = context;
+    if (await settings.get("debugMode")) {
+        log.info("Checking active posts");
+    }
     const {
         approveWithPostScore,
         markSafeWithPostScore,
@@ -180,7 +182,9 @@ export async function checkPosts(
         "postApproveScore",
     );
     if (!markSafeWithPostScore && !approveWithPostScore) {
-        log.info("No actions to take");
+        if (await settings.get("debugMode")) {
+            log.info("No actions to take");
+        }
         return;
     }
     const activePosts = (await PostData.fetchFromCategory(
@@ -233,8 +237,10 @@ export async function checkResponses(
     context: JobContext,
 ) {
     const log = logger.injectArgs("checkResponses");
-    log.info("Checking pending posts");
     const { reddit, settings } = context;
+    if (await settings.get("debugMode")) {
+        log.info("Checking pending posts");
+    }
     const { replyDuration, lateReplyDuration } = await resolveSettings(
         settings,
         "replyDuration",
@@ -267,7 +273,9 @@ export async function checkResponses(
                 }
             }),
     );
-    log.info("Checking no response posts");
+    if (await settings.get("debugMode")) {
+        log.info("Checking no response posts");
+    }
     const noResponse = await PostData.fetchFromCategory(
         PostCategory.NoResponse,
         context,

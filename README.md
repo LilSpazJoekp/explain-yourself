@@ -295,6 +295,12 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+### 1.1.5
+
+- Fix an issue where the app would not respect 'Reply Duration' and 'Late Reply Duration' when set to 0 and would
+  erroneously reject explanations.
+- Fix an issue where modmails would not be automatically archived when certain response text values were not set.
+
 ### 1.1.4
 
 - Fix an issue where if the author replies to the modmail conversation after their explanation has been accepted, they

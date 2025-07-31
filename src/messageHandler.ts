@@ -86,7 +86,7 @@ export async function handleMessage(
     );
     const now = new Date().valueOf();
     const lateReply = replyDuration > 0 && postData.olderThan(replyDuration, now);
-    const tooLateReply = postData.olderThan(lateReplyDuration, now);
+    const tooLateReply = lateReplyDuration > 0 && postData.olderThan(lateReplyDuration, now);
     const status = lateReply ? (tooLateReply ? "too late" : "late") : "on-time";
     log.info("Received %s reply (%s): %s", status, postData.humanAge(), body);
     if (tooLateReply) {

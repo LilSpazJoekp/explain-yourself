@@ -299,6 +299,10 @@ export class PostData {
     }
 
     olderThan(minutes: number, now: number | undefined = undefined): boolean {
+        if (minutes == 0) {
+            this.log.debug("olderThan called with 0 minutes, returning false");
+            return false;
+        }
         this.log.debug(
             "olderThan this.age(now) > (minutes * 60000)",
             this.age(now) > minutes * 60000,
@@ -409,6 +413,7 @@ export class PostData {
                 break;
         }
         if (!body) {
+            await this.context.reddit.modMail.archiveConversation(this.sentModmailId);
             return;
         }
         await this.context.reddit.modMail.reply({
@@ -528,10 +533,11 @@ export class PostData {
 
     async #injectLogArgs(): Promise<void> {
         let additionalArgs: string[] = [];
-        if (await this.context.settings.get("debugMode")) {
+        if (await this.context.settings.get("debugMode") == "true") {
             this.log.prefix =
                 "PostData | postId: %s | u/%s | commentId: %s | conversationId: %s | deleted: %s | removed: %s | safe: %s";
             additionalArgs = [
+                this.postId,
                 this.author,
                 this.commentId,
                 this.sentModmailId,
