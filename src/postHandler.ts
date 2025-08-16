@@ -1,6 +1,6 @@
 import { EventSource } from "@devvit/protos/types/devvit/events/v1alpha/events.js";
 import { TriggerContext, TriggerEventType } from "@devvit/public-api";
-import { CommentType, PostCategory } from "./_types.js";
+import { PostCategory } from "./_types.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
 import { resolveSettings } from "./utils.js";
@@ -26,14 +26,18 @@ export async function handlePost(
     const {
         exclusionRegex,
         exclusionTypes,
-        postFlairIdsList,
-        postFlairIdsListType,
+        postFlairIds,
+        postFlairListType,
+        allowExplanation,
+        explanationPendingComment,
     } = await resolveSettings(
         settings,
         "exclusionRegex",
         "exclusionTypes",
-        "postFlairIdsList",
-        "postFlairIdsListType",
+        "postFlairIds",
+        "postFlairListType",
+        "allowExplanation",
+        "explanationPendingComment",
     );
     if (exclusionRegex) {
         const regex = new RegExp(exclusionRegex, "i");
@@ -52,9 +56,9 @@ export async function handlePost(
         }
     }
 
-    if (postFlairIdsList) {
-        const flairIds = postFlairIdsList.split("\n");
-        const postFlairExclusion: boolean = postFlairIdsListType[0] === "exclusion";
+    if (postFlairIds) {
+        const flairIds = postFlairIds.split("\n");
+        const postFlairExclusion: boolean = postFlairListType[0] === "exclusion";
         const postFlairId = post.flair?.templateId || "";
         if (postFlairExclusion) {
             if (flairIds.includes(postFlairId)) {
@@ -70,30 +74,15 @@ export async function handlePost(
     }
 
     const postData = await PostData.fromPost(context, post);
-
-    const { allowExplanation, lockComment, explanationPendingComment } =
-        await resolveSettings(
-            settings,
-            "allowExplanation",
-            "explanationPendingComment",
-            "lockComment",
-        );
-    if (explanationPendingComment) {
-        const comment = await postData.commentReply(CommentType.Pending);
-        if (comment === undefined) {
-            log.error("Failed to comment");
-            return;
-        }
-        if (lockComment) {
-            await comment.lock();
-        }
+    if (await postData.inCategory(PostCategory.Filtered)) {
+        log.info("Post already marked filtered");
+        return;
     }
-    if (allowExplanation) {
-        await postData.sendMessage(post);
-        await postData.savePost(PostCategory.PendingResponse);
-    } else {
-        await postData.savePost(PostCategory.Active);
-    }
+    await postData.initializePostSession(
+        explanationPendingComment,
+        allowExplanation,
+        post,
+    );
 }
 
 export async function handleDeletion(

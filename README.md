@@ -79,6 +79,12 @@ After the post has been removed:
 - If 'Post Removal Comment Header' is set, a comment with the contents of 'Post Removal Comment Header' will be
   prepended to the comment.
 
+If the post is filtered by AutoModerator and then approved by a moderator, the post will be treated as a new post and
+the app will act on it as if it was just created.
+
+If the post or bot comment is removed then approved by a moderator, the post will accept explanations if an explanation
+was not already accepted prior to removal.
+
 ## Configuration
 
 After installing, you can configure the following options on the app's settings
@@ -294,6 +300,18 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 [GitHub page](https://github.com/LilSpazJoekp/explain-yourself).
 
 ## Changes
+
+### 1.2.0
+
+- Update devvit version.
+- Fix an issue where the post inclusion/exclusion via flair feature was not functioning at all.
+- Add a more descriptive error message when a reply is received after the post is no longer eligible for an
+  explanation.
+- Fix a typo in the error response message.
+- Add handling for post approvals after being filtered by AutoModerator. The post will be treated as a new post and the
+  app will act on it as if it was just created.
+- Add handling for accidental post and bot comment removals by a moderator. The post will accept explanations if an
+  explanation was not already accepted prior to removal.
 
 ### 1.1.5
 

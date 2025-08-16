@@ -9,7 +9,7 @@ import {
 } from "./consts.js";
 import { lookupPostHandler } from "./menuItemHandlers.js";
 import { handleMessage } from "./messageHandler.js";
-import { modActionHandler } from "./modlogHandlers.js";
+import { handleFilter, modActionHandler } from "./modlogHandlers.js";
 import { handleDeletion, handlePost } from "./postHandler.js";
 import {
     checkComments,
@@ -581,12 +581,12 @@ Devvit.addSettings([
         type: "group",
     },
     {
-        defaultValue: false,
+        defaultValue: "false",
         helpText: "If enabled, the app will log additional information to the console.",
         label: "Debug Mode",
         name: "debugMode",
         scope: "app",
-        type: "boolean",
+        type: "string",
     },
     {
         defaultValue: CHECK_CRON,
@@ -623,8 +623,14 @@ Devvit.addTrigger({
     onEvent: appInstalledHandler,
 });
 
+Devvit.addTrigger({
+    event: "AutomoderatorFilterPost",
+    onEvent: handleFilter,
+});
+
 Devvit.addMenuItem({
-    description: "Lookup the modmail thread where the author provided their explanation.",
+    description:
+        "Lookup the modmail thread where the author provided their explanation.",
     forUserType: "moderator",
     label: "Lookup Explanation Modmail",
     location: ["post", "subreddit"],

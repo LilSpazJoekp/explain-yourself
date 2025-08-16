@@ -6,6 +6,7 @@ export class PrefixLogger {
 
     constructor(prefix: string) {
         this.prefix = prefix;
+        this.args = [];
     }
 
     debug(message: string, ...args: any[]) {
@@ -23,8 +24,7 @@ export class PrefixLogger {
     }
 
     injectArgs(...args: any[]) {
-        const logger = new PrefixLogger(this.prefix);
-        logger.args = args;
-        return logger;
+        this.args = args;
+        return this;
     }
 }

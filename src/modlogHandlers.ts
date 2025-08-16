@@ -1,7 +1,9 @@
-import { Context, TriggerContext, TriggerEventType } from "@devvit/public-api";
+import { Context, Post, TriggerContext, TriggerEventType } from "@devvit/public-api";
+import { PostCategory } from "./_types.js";
 import { WATCHED_MODLOG_ACTIONS } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
+import { resolveSettings } from "./utils.js";
 
 const logger = new PrefixLogger(
     "ModLog Handler | action: %s | Mod: u/%s | targetId: %s",
@@ -20,6 +22,9 @@ export async function modActionHandler(
         return;
     }
     switch (event.action) {
+        case "approvecomment":
+            await handleApprove(event, context);
+            break;
         case "approvelink":
             await handleApprove(event, context);
             break;
@@ -27,6 +32,9 @@ export async function modActionHandler(
             await handleRemove(event, context);
             break;
         case "removelink":
+            await handleRemove(event, context);
+            break;
+        case "spamcomment":
             await handleRemove(event, context);
             break;
         case "spamlink":
@@ -40,16 +48,13 @@ export async function modActionHandler(
 /**
  *     Resolve the PostData object from the event data
  *     @param event - The ModAction event.
- *     Only `approvelink`, `removecomment`, `removelink`, and `spamlink` are supported.
+ *     Only `approvecomment`, `approvelink`, `removecomment`, `removelink`, `spamcomment`, and `spamlink` are supported.
  *     @param context - The Context object.
- *     @param validActions - The valid actions to resolve PostData for. First action must be a post related action.
- *     Only `approvelink`, `removecomment`, `removelink`, and `spamlink` are supported.
  *     @returns The PostData object if found.
  */
 async function resolvePostData(
     event: TriggerEventType["ModAction"],
     context: Context | TriggerContext,
-    validActions: string[],
 ): Promise<PostData | undefined> {
     const { reddit } = context;
     const log = logger.injectArgs(
@@ -59,7 +64,7 @@ async function resolvePostData(
     );
     let postId: string;
     let targetId: string;
-    if (event.action === validActions[0]) {
+    if (event.action?.includes("link")) {
         if (event.targetPost === undefined) {
             log.error("No target post found for link related action");
             return;
@@ -88,7 +93,7 @@ async function handleApprove(
     event: TriggerEventType["ModAction"],
     context: TriggerContext,
 ): Promise<void> {
-    const postData = await resolvePostData(event, context, ["approvelink"]);
+    const postData = await resolvePostData(event, context);
     if (postData === undefined) {
         return;
     }
@@ -97,6 +102,27 @@ async function handleApprove(
         event.moderator?.name,
         event.action?.includes("link") ? event.targetPost?.id : event.targetComment?.id,
     );
+    const { allowExplanation, explanationPendingComment } = await resolveSettings(
+        context.settings,
+        "allowExplanation",
+        "explanationPendingComment",
+    );
+    if (await postData.isPendingResponse()) {
+        if (postData.sentModmailId === "") {
+            const post = await context.reddit.getPostById(postData.postId);
+            if (await postData.inCategory(PostCategory.Filtered)) {
+                postData.createdAt = new Date().valueOf();
+            }
+            await postData.initializePostSession(
+                explanationPendingComment,
+                allowExplanation,
+                post,
+            );
+        } else {
+            await postData.setCategory(PostCategory.PendingResponse);
+        }
+        return;
+    }
     await postData.markApproved();
     log.info("Marked Safe");
 }
@@ -105,10 +131,7 @@ async function handleRemove(
     event: TriggerEventType["ModAction"],
     context: TriggerContext,
 ): Promise<void> {
-    const postData = await resolvePostData(event, context, [
-        "removelink",
-        "removecomment",
-    ]);
+    const postData = await resolvePostData(event, context);
     if (postData === undefined) {
         return;
     }
@@ -117,6 +140,28 @@ async function handleRemove(
         event.moderator?.name,
         event.action?.includes("link") ? event.targetPost?.id : event.targetComment?.id,
     );
+    if (await postData.inCategory(PostCategory.Filtered)) {
+        log.info("Post already marked filtered");
+        return;
+    }
     await postData.markRemoved();
     log.info("Marked Removed");
+}
+
+export async function handleFilter(
+    event: TriggerEventType["AutomoderatorFilterPost"],
+    context: TriggerContext,
+): Promise<void> {
+    if (event.post === undefined) {
+        logger.error("No post found for Automoderator filter event");
+        return;
+    }
+    const post: Post = await context.reddit.getPostById(event.post.id);
+    const postData = await PostData.fromPost(context, post);
+    if (postData === undefined) {
+        return;
+    }
+    const log = logger.injectArgs("Automod Filtered", "AutoModerator", post);
+    await postData.markFiltered();
+    log.info("Marked Filtered");
 }

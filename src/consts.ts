@@ -7,6 +7,7 @@ export const POST_WATCHER = "post_watcher";
 export const RESPONSE_WATCHER = "response_watcher";
 export const JOBS = [COMMENT_WATCHER, POST_WATCHER, RESPONSE_WATCHER];
 export const WATCHED_MODLOG_ACTIONS = [
+    "approvecomment",
     "approvelink",
     "removecomment",
     "removelink",
@@ -16,6 +17,7 @@ export const WATCHED_MODLOG_ACTIONS = [
 export enum PrivateNote {
     Approved = "The post/comment was approved by a moderator. This can include approvals performed by the bot itself.",
     Deleted = "The post was deleted by the author.",
+    Filtered = "The post/comment was filtered by AutoModerator. Responses will be allowed after moderator approval.",
     Removed = "The post/comment was removed by a moderator. This can include removals for the following reasons:\n\n- a moderator (other than this bot) removed the post/comment\n- this bot removed the post for failing to meet defined requirements\n- author failed to respond with an explanation within the required time\n- spam",
     Safe = "The post has marked as safe. It will no longer be monitored.",
     NoResponse = "The explanation request was not responded to by the author.",

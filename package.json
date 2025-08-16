@@ -1,8 +1,8 @@
 {
   "dependencies": {
-    "@devvit/protos": "0.11.17",
-    "@devvit/public-api": "0.11.17",
-    "devvit": "0.11.2",
+    "@devvit/protos": "0.11.18",
+    "@devvit/public-api": "0.11.18",
+    "devvit": "0.11.18",
     "node-html-parser": "^6.1.13"
   },
   "devDependencies": {

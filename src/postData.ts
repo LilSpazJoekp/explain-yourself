@@ -4,8 +4,6 @@ import { PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { humanDuration, resolveSetting, resolveSettings } from "./utils.js";
 
-const logger = new PrefixLogger("PostData | postId: %s");
-
 interface AcceptedRespondParams {
     responseType: ResponseType.Accepted;
 }
@@ -16,6 +14,10 @@ interface AlreadyAcceptedRespondParams {
 
 interface ErrorRespondParams {
     responseType: ResponseType.Error;
+}
+
+interface IneligibleRespondParams {
+    responseType: ResponseType.Ineligible;
 }
 
 interface InvalidRespondParams {
@@ -35,6 +37,7 @@ type RespondType =
     | AcceptedRespondParams
     | AlreadyAcceptedRespondParams
     | ErrorRespondParams
+    | IneligibleRespondParams
     | InvalidRespondParams
     | TooLateRespondParams
     | TooShortRespondParams;
@@ -46,7 +49,8 @@ export class PostData {
     context: Context | JobContext | TriggerContext;
     createdAt: number;
     deleted: boolean;
-    log: PrefixLogger;
+    filtered: boolean;
+    log: PrefixLogger = new PrefixLogger("PostData | postId: %s");
     post: Post | null;
     postId: string;
     removed: boolean;
@@ -61,7 +65,7 @@ export class PostData {
         this.context = context;
         this.createdAt = 0;
         this.deleted = false;
-        this.log = logger;
+        this.filtered = false;
         this.post = null;
         this.postId = "";
         this.removed = false;
@@ -78,8 +82,7 @@ export class PostData {
     ): Promise<PostData[]> {
         const { redis } = context;
         const results = await redis.zScan(`posts:${category}`, 0);
-        if ((await context.settings.get("debugMode")) == "true") {
-            // WHY ARE BOOLEAN SETTINGS RETURNED AS STRINGS!?
+        if ((await context.settings.get("debugMode")) === "true") {
             console.log(category, results);
         }
         return (
@@ -113,7 +116,7 @@ export class PostData {
         postData.postId = post.id;
         postData.removed = post.removed;
         postData.post = post;
-        postData.log._debugMode = (await context.settings.get("debugMode")) == "true";
+        postData.log._debugMode = (await context.settings.get("debugMode")) === "true";
         return postData;
     }
 
@@ -129,7 +132,12 @@ export class PostData {
         const postData = new PostData(context);
         const keys = Object.keys(data) as (keyof PostData)[];
         keys.forEach((key: keyof PostData) => {
-            if (key == "deleted" || key === "removed" || key === "safe") {
+            if (
+                key == "deleted" ||
+                key === "filtered" ||
+                key === "removed" ||
+                key === "safe"
+            ) {
                 postData[key] = data[key] === "true";
             } else if (key === "createdAt") {
                 postData[key] = parseInt(data[key]);
@@ -138,7 +146,7 @@ export class PostData {
             }
         });
         postData.postId = postId;
-        postData.log._debugMode = (await context.settings.get("debugMode")) == "true";
+        postData.log._debugMode = (await context.settings.get("debugMode")) === "true";
         return postData;
     }
 
@@ -192,17 +200,12 @@ export class PostData {
                 text = await this.#replacePlaceholders(
                     PlaceholderField.postRemovalCommentHeader,
                 );
-                if (text) {
-                    if (comment) {
-                        if (comment.body.startsWith(text)) {
-                            this.log.info(
-                                `Comment already has Comment${commentType} text`,
-                            );
-                            break;
-                        }
-                        text = `${text}\n${comment.body}`;
-                    }
-                    commentModified = true;
+                comment = await this.context.reddit.getCommentById(this.commentId);
+                {
+                    const result = this.#modifyComment(text, comment, commentType);
+                    if (result.alreadyModified) break;
+                    text = result.text;
+                    commentModified = result.modified;
                 }
                 break;
             case CommentType.Safe:
@@ -210,13 +213,11 @@ export class PostData {
                     PlaceholderField.postMarkedSafeCommentHeader,
                 );
                 comment = await this.context.reddit.getCommentById(this.commentId);
-                if (text && comment) {
-                    if (comment.body.startsWith(text)) {
-                        this.log.info(`Comment already has Comment${commentType} text`);
-                        break;
-                    }
-                    text = `${text}\n${comment.body}`;
-                    commentModified = true;
+                {
+                    const result = this.#modifyComment(text, comment, commentType);
+                    if (result.alreadyModified) break;
+                    text = result.text;
+                    commentModified = result.modified;
                 }
                 break;
             default:
@@ -234,10 +235,10 @@ export class PostData {
                 `Adding comment to ${this.post.id} with Comment${commentType} text`,
             );
             comment = await this.post.addComment({ text });
+            await comment.distinguish(true);
             this.commentId = comment.id;
             await this.writeToRedis();
             await this.#associateIdWithPost("comment", comment.id);
-            await comment.distinguish(true);
         }
         if (await resolveSetting(this.context.settings, "lockComment")) {
             this.log.info(`Locking comment ${comment.id} on ${this.post.id}`);
@@ -257,6 +258,36 @@ export class PostData {
             this.postId,
         );
         return results.members.length > 0;
+    }
+
+    /**
+     * Initializes the post session by commenting and sending a message if allowed.
+     * @param explanationPendingComment - The comment to be posted if an explanation is pending.
+     * @param allowExplanation - Whether to allow sending an explanation message.
+     * @param post - The post to be processed.
+     */
+    async initializePostSession(
+        explanationPendingComment: string,
+        allowExplanation: boolean,
+        post: Post,
+    ) {
+        if (explanationPendingComment) {
+            const comment = await this.commentReply(CommentType.Pending);
+            if (comment === undefined) {
+                this.log.error("Failed to comment");
+                return;
+            }
+        }
+        if (allowExplanation) {
+            await this.sendMessage(post);
+        }
+        await this.savePost(
+            allowExplanation ? PostCategory.PendingResponse : PostCategory.Active,
+        );
+    }
+
+    async isPendingResponse(): Promise<boolean> {
+        return this.responseMessageId === "";
     }
 
     async leavePrivateModNote(noteType: PrivateNote): Promise<void> {
@@ -281,6 +312,13 @@ export class PostData {
         await this.setCategory(PostCategory.Deleted);
         await this.writeToRedis();
         await this.leavePrivateModNote(PrivateNote.Deleted);
+    }
+
+    async markFiltered(): Promise<void> {
+        this.filtered = true;
+        await this.setCategory(PostCategory.Filtered);
+        await this.writeToRedis();
+        await this.leavePrivateModNote(PrivateNote.Filtered);
     }
 
     async markRemoved(): Promise<void> {
@@ -392,7 +430,10 @@ export class PostData {
                 );
                 break;
             case ResponseType.Error:
-                body = `An error occurred while processing your response. Please try again or send a [message](https://www.reddit.com/message/compose/?to=r/${this.context.subredditName} to the subreddit moderators.`;
+                body = `An error occurred while processing your response. Please try again or send a [message](https://www.reddit.com/message/compose/?to=r/${this.context.subredditName}) to the subreddit moderators.`;
+                break;
+            case ResponseType.Ineligible:
+                body = `Your post is not eligible for a response. Please ensure that you are responding to an eligible post.`;
                 break;
             case ResponseType.Invalid:
                 body = await this.#replacePlaceholders(
@@ -533,20 +574,40 @@ export class PostData {
 
     async #injectLogArgs(): Promise<void> {
         let additionalArgs: string[] = [];
-        if (await this.context.settings.get("debugMode") == "true") {
+        if ((await this.context.settings.get("debugMode")) === "true") {
             this.log.prefix =
-                "PostData | postId: %s | u/%s | commentId: %s | conversationId: %s | deleted: %s | removed: %s | safe: %s";
+                "PostData | postId: %s | u/%s | commentId: %s | conversationId: %s | deleted: %s | filtered: %s | removed: %s | safe: %s";
             additionalArgs = [
                 this.postId,
                 this.author,
                 this.commentId,
                 this.sentModmailId,
                 this.deleted.toString(),
+                this.filtered.toString(),
                 this.removed.toString(),
                 this.safe.toString(),
             ];
         }
         this.log.injectArgs(this.postId, ...additionalArgs);
+    }
+
+    #modifyComment(
+        header: string,
+        comment: Comment | undefined,
+        commentType: CommentType,
+    ): { text: string; modified: boolean; alreadyModified: boolean } {
+        if (!header || !comment) {
+            return { text: header, modified: false, alreadyModified: false };
+        }
+        if (comment.body.startsWith(header)) {
+            this.log.info(`Comment already has Comment${commentType} text`);
+            return { text: header, modified: false, alreadyModified: true };
+        }
+        return {
+            text: `${header}\n${comment.body}`,
+            modified: true,
+            alreadyModified: false,
+        };
     }
 
     async #replacePlaceholders(field: PlaceholderField): Promise<string> {

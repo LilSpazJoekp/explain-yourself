@@ -48,11 +48,10 @@ export async function resolveSettings<T extends keyof ExplainYourselfSettings>(
     ...names: T[]
 ): Promise<Pick<ExplainYourselfSettings, T>> {
     const settings: Partial<ExplainYourselfSettings> = {};
-    await Promise.all(
-        names.map(async (name) => {
-            settings[name] = await resolveSetting<T>(settingsClient, name);
-        }),
-    );
+    const allSettings = await settingsClient.getAll<ExplainYourselfSettings>();
+    names.map((name) => {
+        settings[name] = allSettings[name];
+    });
     return settings as Pick<ExplainYourselfSettings, T>;
 }
 
@@ -195,7 +194,7 @@ export function textField(params: TextFieldParams): {
 export function humanDuration(minutes: number): string {
     const days = Math.floor(minutes / 1440);
     const hours = Math.floor((minutes % 1440) / 60);
-    const remainingMinutes = minutes % 60;
+    const remainingMinutes = Math.floor(minutes % 60);
     const parts = [];
     if (days > 0) {
         parts.push(`${days} day${days === 1 ? "" : "s"}`);

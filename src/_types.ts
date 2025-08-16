@@ -1,3 +1,6 @@
+import { Comment, Post } from "@devvit/public-api";
+import { PostData } from "./postData.js";
+
 export interface ExplainYourselfSettings {
     allowExplanation: boolean;
     approveWithCommentScore: boolean;
@@ -24,8 +27,8 @@ export interface ExplainYourselfSettings {
     messageRequiredLength: number;
     messageSubject: string;
     postApproveScore: number;
-    postFlairIdsList: string;
-    postFlairIdsListType: string[]
+    postFlairIds: string;
+    postFlairListType: string[];
     postMarkedSafeCommentHeader: string;
     postRemovalCommentHeader: string;
     postSafeScore: number;
@@ -73,7 +76,7 @@ export enum Placeholder {
 
 export type FieldParams = {
     label: string;
-    name: string;
+    name: keyof ExplainYourselfSettings;
 };
 
 export type NumberFieldParams = {
@@ -100,6 +103,7 @@ export enum CommentType {
 export enum PostCategory {
     Active = "active",
     Deleted = "deleted",
+    Filtered = "filtered",
     NoResponse = "noResponse",
     PendingResponse = "pendingResponse",
     Removed = "removed",
@@ -110,7 +114,10 @@ export enum ResponseType {
     Accepted = "accepted",
     AlreadyAccepted = "alreadyAccepted",
     Error = "error",
+    Ineligible = "ineligible",
     Invalid = "invalid",
     TooLate = "tooLate",
     TooShort = "tooShort",
 }
+
+export type PostDataList = (PostData & { comment: Comment; post: Post })[];

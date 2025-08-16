@@ -86,7 +86,8 @@ export async function handleMessage(
     );
     const now = new Date().valueOf();
     const lateReply = replyDuration > 0 && postData.olderThan(replyDuration, now);
-    const tooLateReply = lateReplyDuration > 0 && postData.olderThan(lateReplyDuration, now);
+    const tooLateReply =
+        lateReplyDuration > 0 && postData.olderThan(lateReplyDuration, now);
     const status = lateReply ? (tooLateReply ? "too late" : "late") : "on-time";
     log.info("Received %s reply (%s): %s", status, postData.humanAge(), body);
     if (tooLateReply) {
@@ -124,10 +125,7 @@ export async function handleMessage(
     }
     const cleanedReply = parsedHtml.text.replace(/\W/g, "");
     if (cleanedReply.length >= messageRequiredLength) {
-        if (
-            (await postData.inCategory(PostCategory.PendingResponse)) ||
-            (await postData.inCategory(PostCategory.NoResponse))
-        ) {
+        if (await postData.isPendingResponse()) {
             log.info("Reply accepted");
             const comment = await postData.commentReply(CommentType.Accepted, body);
             if (comment === undefined) {
@@ -146,7 +144,7 @@ export async function handleMessage(
             log.error(
                 `Post not in pending response category or in no response category and eligible for response`,
             );
-            await postData.respond({ responseType: ResponseType.Error });
+            await postData.respond({ responseType: ResponseType.Ineligible });
         }
     } else {
         log.info(

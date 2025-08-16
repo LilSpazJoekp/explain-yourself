@@ -5,7 +5,7 @@ import {
     Post,
     ScheduledJobEvent,
 } from "@devvit/public-api";
-import { CommentType, PostCategory } from "./_types.js";
+import { CommentType, PostCategory, PostDataList } from "./_types.js";
 import { CHECK_CRON, JOBS, PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
@@ -18,7 +18,10 @@ export async function checkComments(
     context: JobContext,
 ) {
     const log = logger.injectArgs("checkComments");
-    log.info("Checking active posts");
+    const debugMode = (await context.settings.get("debugMode")) === "true";
+    if (debugMode) {
+        log.info("Checking active posts");
+    }
     const { settings } = context;
     const {
         commentApproveScore,
@@ -49,36 +52,47 @@ export async function checkComments(
         context,
         true,
         true,
-    )) as (PostData & { comment: Comment; post: Post })[];
+    )) as PostDataList;
     const now = Date.now().valueOf();
     const activePosts = fetchedPosts
         .filter((postData) => {
-            log.info("Checking age of post %s", postData.postId);
-            log.info("Post age: %s", postData.age(now));
-            log.info("Comment min age: %s", commentMinAge * 60000);
-            log.info(
-                "postData.age(now) >= commentMinAge",
-                postData.age(now) >= commentMinAge * 60000,
-            );
+            if (debugMode) {
+                log.info("[%s] Post age: %s", postData.postId, postData.age(now));
+                log.info(
+                    "[%s] Comment min age: %s",
+                    postData.postId,
+                    commentMinAge * 60000,
+                );
+                log.info(
+                    "[%s] Post comment old enough? (postData.age(now) >= commentMinAge): %s",
+                    postData.postId,
+                    postData.age(now) >= commentMinAge * 60000,
+                );
+            }
             return postData.age(now) >= commentMinAge * 60000;
         })
         .filter((postData) => {
-            log.info("Checking age of post %s", postData.postId);
-            log.info("Post age: %s", postData.age(now));
-            log.info("Comment min age: %s", commentMaxAge * 60000);
-            log.info(
-                "postData.age(now) <= commentMaxAge",
-                postData.age(now) <= commentMaxAge * 60000,
-            );
+            if (debugMode) {
+                log.info(
+                    "[%s] Comment max age: %s",
+                    postData.postId,
+                    commentMaxAge * 60000,
+                );
+                log.info(
+                    "[%s] Post comment not too old? (postData.age(now) <= commentMaxAge): %s",
+                    postData.postId,
+                    postData.age(now) <= commentMaxAge * 60000,
+                );
+            }
             return postData.age(now) <= commentMaxAge * 60000;
         });
 
-    const toApprove: (PostData & { comment: Comment; post: Post })[] = [];
+    const toApprove: PostDataList = [];
     const toMarkSafe = fetchedPosts.filter((postData) =>
         postData.olderThan(commentMaxAge, now),
     );
-    const toRemove: (PostData & { comment: Comment; post: Post })[] = [];
-    const toReport: (PostData & { comment: Comment; post: Post })[] = [];
+    const toRemove: PostDataList = [];
+    const toReport: PostDataList = [];
     await Promise.all(
         activePosts.map(
             async (
@@ -89,7 +103,7 @@ export async function checkComments(
                     postData.comment.score >= commentSafeScore
                 ) {
                     log.info(
-                        "Adding post %s to toMarkSafe due to comment score (%s >= %s)",
+                        "[%s] Adding post to toMarkSafe due to comment score (%s >= %s)",
                         postData.postId,
                         postData.comment.score,
                         commentSafeScore,
@@ -97,15 +111,21 @@ export async function checkComments(
                     toMarkSafe.push(postData);
                     return;
                 }
-                log.info("checking score");
-                log.info("comment score: %s", postData.comment.score);
-                log.info("removal score: %s", await postData.removalScore(now));
-                if (postData.comment.score <= (await postData.removalScore(now))) {
+                const removalScore = await postData.removalScore(now);
+                if (debugMode) {
                     log.info(
-                        "Adding post %s to toRemove due to comment score (%s <= %s)",
+                        "[%s] comment score: %s",
                         postData.postId,
                         postData.comment.score,
-                        await postData.removalScore(now),
+                    );
+                    log.info("[%s] removal score: %s", postData.postId, removalScore);
+                }
+                if (postData.comment.score <= removalScore) {
+                    log.info(
+                        "[%s] Adding post to toRemove due to comment score (%s <= %s)",
+                        postData.postId,
+                        postData.comment.score,
+                        removalScore,
                     );
                     if (removeWithCommentScore) toRemove.push(postData);
                     if (reportWithCommentScore && reportReason) toReport.push(postData);
@@ -116,7 +136,7 @@ export async function checkComments(
                     postData.comment.score >= commentApproveScore
                 ) {
                     log.info(
-                        "Adding post %s to toApprove due to comment score (%s >= %s)",
+                        "[%s] Adding post to toApprove due to comment score (%s >= %s)",
                         postData.postId,
                         postData.comment.score,
                         commentApproveScore,
@@ -130,13 +150,16 @@ export async function checkComments(
     await Promise.all(
         toMarkSafe
             .map(async (postData) => {
-                log.info("Setting post %s as safe", postData.postId);
+                log.info("[%s] Setting post as safe", postData.postId);
                 await postData.markSafe();
                 await postData.commentReply(CommentType.Safe);
             })
             .concat(
                 toApprove.map(async (postData) => {
-                    log.info("Approving post %s and setting as safe", postData.postId);
+                    log.info(
+                        "[%s] Approving post and setting as safe",
+                        postData.postId,
+                    );
                     await postData.post.approve();
                     await postData.markApproved();
                     await postData.commentReply(CommentType.Safe);
@@ -144,7 +167,7 @@ export async function checkComments(
             )
             .concat(
                 toRemove.map(async (postData) => {
-                    log.info("Removing post %s", postData.postId);
+                    log.info("[%s] Removing post", postData.postId);
                     await postData.post.remove();
                     await postData.markRemoved();
                     await postData.commentReply(CommentType.Removed);
@@ -152,7 +175,11 @@ export async function checkComments(
             )
             .concat(
                 toReport.map(async (postData) => {
-                    log.info("Reporting comment %s", postData.comment.id);
+                    log.info(
+                        "[%s] Reporting comment %s",
+                        postData.postId,
+                        postData.comment.id,
+                    );
                     await postData.report();
                     await postData.setCategory(PostCategory.Removed);
                 }),
@@ -166,7 +193,8 @@ export async function checkPosts(
 ) {
     const log = logger.injectArgs("checkPosts");
     const { settings } = context;
-    if (await settings.get("debugMode")) {
+    const debugMode = (await settings.get("debugMode")) === "true";
+    if (debugMode) {
         log.info("Checking active posts");
     }
     const {
@@ -182,7 +210,7 @@ export async function checkPosts(
         "postApproveScore",
     );
     if (!markSafeWithPostScore && !approveWithPostScore) {
-        if (await settings.get("debugMode")) {
+        if (debugMode) {
             log.info("No actions to take");
         }
         return;
@@ -238,7 +266,8 @@ export async function checkResponses(
 ) {
     const log = logger.injectArgs("checkResponses");
     const { reddit, settings } = context;
-    if (await settings.get("debugMode")) {
+    const debugMode = (await settings.get("debugMode")) === "true";
+    if (debugMode) {
         log.info("Checking pending posts");
     }
     const { replyDuration, lateReplyDuration } = await resolveSettings(
@@ -260,10 +289,13 @@ export async function checkResponses(
                     replyDuration > 0 && postData.olderThan(replyDuration, now),
             )
             .map(async (postData) => {
-                log.info("Removing post %s due to no response", postData.postId);
+                log.info("[%s] Removing post due to no response", postData.postId);
                 await reddit.remove(postData.postId, false);
                 if (lateReplyDuration < 1) {
-                    log.info("Author did not reply in allotted time, removing post");
+                    log.info(
+                        "[%s] Author did not reply in allotted time, removing post",
+                        postData.postId,
+                    );
                     await postData.commentReply(CommentType.Removed);
                     await postData.setCategory(PostCategory.Removed);
                     await postData.leavePrivateModNote(PrivateNote.Removed);
@@ -273,7 +305,7 @@ export async function checkResponses(
                 }
             }),
     );
-    if (await settings.get("debugMode")) {
+    if (debugMode) {
         log.info("Checking no response posts");
     }
     const noResponse = await PostData.fetchFromCategory(
@@ -287,7 +319,8 @@ export async function checkResponses(
             .filter((postData) => postData.olderThan(lateReplyDuration, now))
             .map(async (postData) => {
                 log.info(
-                    "Author did not late reply in allotted time, removing submission",
+                    "[%s] Author did not late reply in allotted time, removing submission",
+                    postData.postId,
                 );
                 await reddit.remove(postData.postId, false);
                 await postData.commentReply(CommentType.Removed);

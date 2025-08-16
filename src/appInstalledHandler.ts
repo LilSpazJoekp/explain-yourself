@@ -22,9 +22,4 @@ export async function appInstalledHandler(
     log.info("All jobs cancelled");
     log.info(`Setting up ${JOB_WATCHER}`);
     await context.scheduler.runJob({ cron: CHECK_CRON, name: JOB_WATCHER });
-    // await context.scheduler.runJob({ cron: CHECK_CRON, name: COMMENT_WATCHER });
-    // log.info(`Setting up ${POST_WATCHER}`);
-    // await context.scheduler.runJob({ cron: CHECK_CRON, name: POST_WATCHER });
-    // log.info(`Setting up ${RESPONSE_WATCHER}`);
-    // await context.scheduler.runJob({ cron: CHECK_CRON, name: RESPONSE_WATCHER });
 }
