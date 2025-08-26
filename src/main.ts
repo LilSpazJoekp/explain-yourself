@@ -350,7 +350,7 @@ Devvit.addSettings([
                 fields: [
                     {
                         ...textField({
-                            blankIsDisabled: true,
+                            blankIsDisabled: false,
                             helpText:
                                 "Comment to be posted when the author's explanation is pending acceptance. This can also be used as a" +
                                 " 'Upvote this comment if the post is good or downvote if not' comment without explanation.",

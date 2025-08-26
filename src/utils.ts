@@ -6,6 +6,7 @@ import {
     Placeholder,
     TextFieldParams,
 } from "./_types.js";
+import { DEFAULT_RETRIES } from "./consts.js";
 
 export function numberField(params: FieldParams & NumberFieldParams): {
     label: string;
@@ -84,16 +85,16 @@ function validatedRange(
     };
 }
 
-// function validatedLength(
-//     fieldName: string,
-//     maxLength: number,
-// ): (event: SettingsFormFieldValidatorEvent<string>) => string | undefined {
-//     return (event: SettingsFormFieldValidatorEvent<string>) => {
-//         if (event.value !== undefined && event.value.length > maxLength) {
-//             return `${fieldName} must be at most ${maxLength} characters long.`;
-//         }
-//     };
-// }
+function validatedLength(
+    fieldName: string,
+    maxLength: number,
+): (event: SettingsFormFieldValidatorEvent<string>) => string | undefined {
+    return (event: SettingsFormFieldValidatorEvent<string>) => {
+        if (event.value !== undefined && event.value.length > maxLength) {
+            return `${fieldName} must be at most ${maxLength} characters long.`;
+        }
+    };
+}
 
 function validatedPlaceholders(
     fieldName: string,
@@ -144,9 +145,9 @@ export function textField(params: TextFieldParams): {
         )} setting${
             multipleActions ? "s" : ""
         } ${multipleActions ? "are" : "is"} ${!params.blankIsDisabled ? "enabled" : "disabled"}.`;
-        if (params.blankIsDisabled) {
-            helpText += " Leave blank to disable.";
-        }
+    }
+    if (params.blankIsDisabled) {
+        helpText += " Leave blank to disable.";
     }
     const data: {
         helpText: string;
@@ -169,9 +170,16 @@ export function textField(params: TextFieldParams): {
     const validators: ((
         event: SettingsFormFieldValidatorEvent<string>,
     ) => string | undefined)[] = [];
+    if (!params.blankIsDisabled) {
+        validators.push((event: SettingsFormFieldValidatorEvent<string>) => {
+            if (event.value === undefined || event.value.trim().length === 0) {
+                return `${params.label} is required.`;
+            }
+        });
+    }
     if (params.maxLength !== undefined) {
         data.helpText += ` Maximum length: ${params.maxLength} characters.`;
-        // validators.push(validatedLength(params.label, params.maxLength));
+        validators.push(validatedLength(params.label, params.maxLength));
     }
     if (params.requiredPlaceholders && params.requiredPlaceholders.length > 0) {
         data.helpText += ` Required placeholders: ${humanList(params.requiredPlaceholders, "and")}.`;
@@ -206,4 +214,27 @@ export function humanDuration(minutes: number): string {
         parts.push(`${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`);
     }
     return parts.join(" ");
+}
+
+export async function withRetries<T>(
+    fn: () => Promise<T> | T,
+    retries: number = DEFAULT_RETRIES,
+): Promise<T> {
+    let attempt = 0;
+    while (true) {
+        try {
+            if (fn instanceof Promise) {
+                return await fn;
+            }
+            return fn();
+        } catch (error) {
+            attempt++;
+            console.debug(`Attempt ${attempt} failed: ${error}`);
+            if (attempt > retries) {
+                console.error(`All ${retries} retries failed.`);
+                throw error;
+            }
+        }
+        console.debug(`Retrying attempt ${attempt + 1}...`);
+    }
 }

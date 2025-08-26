@@ -142,8 +142,8 @@ page: https://developers.reddit.com/r/<SUBREDDIT>/post-explainer
   ignored/processed based on 'Post Flair List Type'. Post flair IDs can be found here (replace SUBREDDIT with your
   subreddit): https://www.reddit.com/mod/SUBREDDIT/postflair and hovering your mouse over/tapping the desired flair and
   clicking 'Copy ID'.
-- **Post Flair List Type**: The type of action to take if the post flair matches. Options are 'Inclusion' or '
-  Exclusion'.
+- **Post Flair List Type**: The type of action to take if the post flair matches. Options are 'Inclusion' or
+  'Exclusion'.
 
 #### Action Settings
 
@@ -159,8 +159,7 @@ page: https://developers.reddit.com/r/<SUBREDDIT>/post-explainer
 #### Comment Customizations
 
 - **Explanation Pending Comment**: Comment to be posted when the author's explanation is pending acceptance. This can
-  also be used as a 'Upvote this comment if the post is good or downvote if not' comment without explanation. Leave
-  blank to disable.
+  also be used as a 'Upvote this comment if the post is good or downvote if not' comment without explanation.
 - **Explanation Accepted Comment**: Comment to be posted when the author's explanation is accepted. Leave blank to
   disable. Ignored if 'Allow Explanation' is disabled.
 - **Post Removal Comment Header**: Header that is prepended to the comment when the post is removed due to insufficient
@@ -300,6 +299,12 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 [GitHub page](https://github.com/LilSpazJoekp/explain-yourself).
 
 ## Changes
+
+### 1.2.4
+
+- Fix a bug where the app would infinitely loop when removing a post that failed to meet requirements.
+- Add retry logic when performing certain actions to mitigate transient errors.
+- Fix a bug where some settings were not being validated correctly.
 
 ### 1.2.0
 

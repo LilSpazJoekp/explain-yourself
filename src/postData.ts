@@ -2,7 +2,12 @@ import { Comment, Context, JobContext, Post, TriggerContext } from "@devvit/publ
 import { CommentType, PlaceholderField, PostCategory, ResponseType } from "./_types.js";
 import { PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
-import { humanDuration, resolveSetting, resolveSettings } from "./utils.js";
+import {
+    humanDuration,
+    resolveSetting,
+    resolveSettings,
+    withRetries,
+} from "./utils.js";
 
 interface AcceptedRespondParams {
     responseType: ResponseType.Accepted;
@@ -182,11 +187,11 @@ export class PostData {
         let commentModified = false;
         switch (commentType) {
             case CommentType.Accepted:
-                if (explanation === undefined) {
-                    throw new Error("Comment type Accepted requires an explanation");
+                if (explanation) {
+                    text =
+                        await this.#generateExplanationAcceptedCommentBody(explanation);
+                    commentModified = true;
                 }
-                text = await this.#generateExplanationAcceptedCommentBody(explanation);
-                commentModified = true;
                 break;
             case CommentType.Pending:
                 text = await this.#replacePlaceholders(
@@ -200,7 +205,6 @@ export class PostData {
                 text = await this.#replacePlaceholders(
                     PlaceholderField.postRemovalCommentHeader,
                 );
-                comment = await this.context.reddit.getCommentById(this.commentId);
                 {
                     const result = this.#modifyComment(text, comment, commentType);
                     if (result.alreadyModified) break;
@@ -212,7 +216,6 @@ export class PostData {
                 text = await this.#replacePlaceholders(
                     PlaceholderField.postMarkedSafeCommentHeader,
                 );
-                comment = await this.context.reddit.getCommentById(this.commentId);
                 {
                     const result = this.#modifyComment(text, comment, commentType);
                     if (result.alreadyModified) break;
@@ -229,19 +232,33 @@ export class PostData {
         }
         if (comment) {
             this.log.info(`Editing comment with Comment${commentType} text`);
-            await comment.edit({ text });
+            try {
+                comment = await withRetries(() => comment?.edit({ text }));
+            } catch (error) {
+                this.log.error("Failed to edit comment", error);
+                return;
+            }
         } else {
             this.log.info(
                 `Adding comment to ${this.post.id} with Comment${commentType} text`,
             );
-            comment = await this.post.addComment({ text });
+            try {
+                comment = await withRetries(() => this.post?.addComment({ text }), 5);
+            } catch (error) {
+                this.log.error("Failed to add comment", error);
+                return;
+            }
+            if (!comment) {
+                this.log.error("No comment to associate");
+                return;
+            }
             await comment.distinguish(true);
             this.commentId = comment.id;
             await this.writeToRedis();
             await this.#associateIdWithPost("comment", comment.id);
         }
-        if (await resolveSetting(this.context.settings, "lockComment")) {
-            this.log.info(`Locking comment ${comment.id} on ${this.post.id}`);
+        if ((await resolveSetting(this.context.settings, "lockComment")) && comment) {
+            this.log.info(`Locking comment ${comment.id}`);
             await comment.lock();
         }
         return comment;
@@ -296,7 +313,9 @@ export class PostData {
             body: noteType.valueOf(),
             isInternal: true,
         });
-        await this.context.reddit.modMail.archiveConversation(this.sentModmailId);
+        await withRetries(() =>
+            this.context.reddit.modMail.archiveConversation(this.sentModmailId),
+        );
     }
 
     async markApproved(): Promise<void> {
@@ -338,16 +357,19 @@ export class PostData {
 
     olderThan(minutes: number, now: number | undefined = undefined): boolean {
         if (minutes == 0) {
-            this.log.debug("olderThan called with 0 minutes, returning false");
             return false;
         }
+        const age = this.age(now);
+        const milliseconds = minutes * 60000;
+        const result = age > milliseconds;
         this.log.debug(
-            "olderThan this.age(now) > (minutes * 60000)",
-            this.age(now) > minutes * 60000,
-            this.age(now),
-            minutes * 60000,
+            "olderThan this.age(now) > (minutes * 60000): %s | this.age(now): %s | minutes * 60000: %s",
+            this.postId,
+            result,
+            age,
+            milliseconds,
         );
-        return this.age(now) > minutes * 60000;
+        return result;
     }
 
     async removalScore(now: number | undefined = undefined): Promise<number> {
@@ -454,7 +476,9 @@ export class PostData {
                 break;
         }
         if (!body) {
-            await this.context.reddit.modMail.archiveConversation(this.sentModmailId);
+            await withRetries(() =>
+                this.context.reddit.modMail.archiveConversation(this.sentModmailId),
+            );
             return;
         }
         await this.context.reddit.modMail.reply({
@@ -462,7 +486,9 @@ export class PostData {
             body,
             isAuthorHidden: true,
         });
-        await this.context.reddit.modMail.archiveConversation(this.sentModmailId);
+        await withRetries(() =>
+            this.context.reddit.modMail.archiveConversation(this.sentModmailId),
+        );
     }
 
     async savePost(category: PostCategory): Promise<void> {
@@ -483,13 +509,21 @@ export class PostData {
                 100 - postIdPrefix.length,
             );
         const body = await this.#replacePlaceholders(PlaceholderField.messageBody);
-        const conversationData = await reddit.modMail.createConversation({
-            body: body,
-            isAuthorHidden: true,
-            subject: subject,
-            subredditName: subredditName as string,
-            to: post.authorName,
-        });
+        let conversationData;
+        try {
+            conversationData = await withRetries(() =>
+                reddit.modMail.createConversation({
+                    body: body,
+                    isAuthorHidden: true,
+                    subject: subject,
+                    subredditName: subredditName as string,
+                    to: post.authorName,
+                }),
+            );
+        } catch (error) {
+            this.log.error("Failed to send modmail", error);
+            return;
+        }
         if (conversationData) {
             await this.#associateIdWithPost(
                 "conversation",
@@ -499,8 +533,10 @@ export class PostData {
             await this.writeToRedis();
         }
         try {
-            await reddit.modMail.archiveConversation(
-                conversationData.conversation.id as string,
+            await withRetries(() =>
+                this.context.reddit.modMail.archiveConversation(
+                    conversationData.conversation.id as string,
+                ),
             );
         } catch (error) {
             this.log.error("Failed to archive conversation", error);
@@ -575,10 +611,8 @@ export class PostData {
     async #injectLogArgs(): Promise<void> {
         let additionalArgs: string[] = [];
         if ((await this.context.settings.get("debugMode")) === "true") {
-            this.log.prefix =
-                "PostData | postId: %s | u/%s | commentId: %s | conversationId: %s | deleted: %s | filtered: %s | removed: %s | safe: %s";
+            this.log.prefix = `${this.log.prefix} | u/%s | commentId: %s | conversationId: %s | deleted: %s | filtered: %s | removed: %s | safe: %s`;
             additionalArgs = [
-                this.postId,
                 this.author,
                 this.commentId,
                 this.sentModmailId,
@@ -592,21 +626,21 @@ export class PostData {
     }
 
     #modifyComment(
-        header: string,
+        text: string,
         comment: Comment | undefined,
         commentType: CommentType,
     ): { text: string; modified: boolean; alreadyModified: boolean } {
-        if (!header || !comment) {
-            return { text: header, modified: false, alreadyModified: false };
+        if (!text || !comment) {
+            return { alreadyModified: false, modified: false, text: text };
         }
-        if (comment.body.startsWith(header)) {
+        if (comment.body.startsWith(text)) {
             this.log.info(`Comment already has Comment${commentType} text`);
-            return { text: header, modified: false, alreadyModified: true };
+            return { alreadyModified: true, modified: false, text: text };
         }
         return {
-            text: `${header}\n${comment.body}`,
-            modified: true,
             alreadyModified: false,
+            modified: true,
+            text: `${text}\n${comment.body}`,
         };
     }
 

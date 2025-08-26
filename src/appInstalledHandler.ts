@@ -10,6 +10,16 @@ export async function appInstalledHandler(
 ) {
     const log = logger.injectArgs(event.type);
     let jobs = await context.scheduler.listJobs();
+    const pendingResponseComment = (await context.settings.get(
+        "explanationPendingComment",
+    )) as string;
+    if (!pendingResponseComment || pendingResponseComment.trim() === "") {
+        await context.reddit.modMail.createModInboxConversation({
+            subredditId: context.subredditId,
+            subject: "Explain Yourself setup",
+            bodyMarkdown: `Hello!\n\nI'm writing to let you know that 'Pending Explanation Comment' is now a required configuration setting. Please set it [here](https://developers.reddit.com/r/${context.subredditName}/apps/${context.appName}) for the bot to function correctly.\n\nThanks!`,
+        });
+    }
     while (jobs.length > 0) {
         await Promise.all(
             jobs.map(async (job) => {

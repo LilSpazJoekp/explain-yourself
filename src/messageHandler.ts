@@ -4,7 +4,7 @@ import { CommentType, PostCategory, ResponseType } from "./_types.js";
 import { URL_REGEX } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
-import { humanDuration, resolveSettings } from "./utils.js";
+import { humanDuration, resolveSettings, withRetries } from "./utils.js";
 
 const logger = new PrefixLogger(
     "Message Handler | u/%s | conversationId: %s | messageId: %s",
@@ -157,5 +157,5 @@ export async function handleMessage(
             responseType: ResponseType.TooShort,
         });
     }
-    await reddit.modMail.archiveConversation(conversationId);
+    await withRetries(() => reddit.modMail.archiveConversation(conversationId));
 }
