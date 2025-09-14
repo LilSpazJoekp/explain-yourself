@@ -501,13 +501,12 @@ export class PostData {
 
     async sendMessage(post: Post): Promise<void> {
         const { reddit, subredditName } = this.context;
-        const postIdPrefix = `[${post.id}]: `;
+        const postIdPrefix = ` [${post.id}]`;
         const subject =
-            postIdPrefix +
             (await this.#replacePlaceholders(PlaceholderField.messageSubject)).slice(
                 0,
                 100 - postIdPrefix.length,
-            );
+            ) + postIdPrefix;
         const body = await this.#replacePlaceholders(PlaceholderField.messageBody);
         let conversationData;
         try {

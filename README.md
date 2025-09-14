@@ -300,6 +300,10 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+### 1.2.5
+
+- Move post ID to end of the message subject.
+
 ### 1.2.4
 
 - Fix a bug where the app would infinitely loop when removing a post that failed to meet requirements.
