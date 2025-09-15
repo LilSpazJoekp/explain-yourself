@@ -157,5 +157,15 @@ export async function handleMessage(
             responseType: ResponseType.TooShort,
         });
     }
+    if (
+        (
+            await reddit.modMail.getConversation({
+                conversationId: postData.sentModmailId,
+            })
+        ).conversation?.isInternal
+    ) {
+        log.info("Conversation is internal. Not archiving.");
+        return;
+    }
     await withRetries(() => reddit.modMail.archiveConversation(conversationId));
 }

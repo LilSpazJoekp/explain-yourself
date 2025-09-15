@@ -11,13 +11,13 @@ import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
 import { resolveSettings } from "./utils.js";
 
-const logger = new PrefixLogger("Scheduled Job Handler | %s");
-
 export async function checkComments(
     _event: ScheduledJobEvent<JSONObject>,
     context: JobContext,
 ) {
-    const log = logger.injectArgs("checkComments");
+    const log = new PrefixLogger("Scheduled Job Handler | %s").injectArgs(
+        "checkComments",
+    );
     const debugMode = (await context.settings.get("debugMode")) === "true";
     if (debugMode) {
         log.info("Checking active posts");
@@ -120,15 +120,17 @@ export async function checkComments(
                     );
                     log.info("[%s] removal score: %s", postData.postId, removalScore);
                 }
-                if (postData.comment.score <= removalScore) {
+                if (
+                    postData.comment.score <= removalScore &&
+                    (removeWithCommentScore || (reportWithCommentScore && reportReason))
+                ) {
                     log.info(
                         "[%s] Adding post to toRemove due to comment score (%s <= %s)",
                         postData.postId,
                         postData.comment.score,
                         removalScore,
                     );
-                    if (removeWithCommentScore) toRemove.push(postData);
-                    if (reportWithCommentScore && reportReason) toReport.push(postData);
+                    toRemove.push(postData);
                     return;
                 }
                 if (
@@ -191,7 +193,7 @@ export async function checkPosts(
     _event: ScheduledJobEvent<JSONObject>,
     context: JobContext,
 ) {
-    const log = logger.injectArgs("checkPosts");
+    const log = new PrefixLogger("Scheduled Job Handler | %s").injectArgs("checkPosts");
     const { settings } = context;
     const debugMode = (await settings.get("debugMode")) === "true";
     if (debugMode) {
@@ -264,7 +266,9 @@ export async function checkResponses(
     _event: ScheduledJobEvent<JSONObject>,
     context: JobContext,
 ) {
-    const log = logger.injectArgs("checkResponses");
+    const log = new PrefixLogger("Scheduled Job Handler | %s").injectArgs(
+        "checkResponses",
+    );
     const { reddit, settings } = context;
     const debugMode = (await settings.get("debugMode")) === "true";
     if (debugMode) {
@@ -334,7 +338,7 @@ export async function ensureJobs(
     _event: ScheduledJobEvent<JSONObject>,
     { scheduler }: JobContext,
 ) {
-    const log = logger.injectArgs("ensureJobs");
+    const log = new PrefixLogger("Scheduled Job Handler | %s").injectArgs("ensureJobs");
     const runningJobs = await scheduler.listJobs();
     const missingJobs: string[] = [];
     JOBS.forEach((job) => {

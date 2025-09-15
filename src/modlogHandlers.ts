@@ -1,4 +1,10 @@
-import { Context, Post, TriggerContext, TriggerEventType } from "@devvit/public-api";
+import {
+    Context,
+    Post,
+    Subreddit,
+    TriggerContext,
+    TriggerEventType,
+} from "@devvit/public-api";
 import { PostCategory } from "./_types.js";
 import { WATCHED_MODLOG_ACTIONS } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
@@ -94,6 +100,7 @@ async function handleApprove(
     context: TriggerContext,
 ): Promise<void> {
     const postData = await resolvePostData(event, context);
+    const subreddit: Subreddit = await context.reddit.getCurrentSubreddit();
     if (postData === undefined) {
         return;
     }
@@ -107,6 +114,18 @@ async function handleApprove(
         "allowExplanation",
         "explanationPendingComment",
     );
+    if (await postData.inCategory(PostCategory.Safe)) {
+        log.info("Post already marked as safe");
+        return;
+    }
+    const authorName = postData.author
+    if ((
+        await subreddit.getModerators({username: authorName}).all()
+    ).length > 0) {
+        log.info("Author is a moderator, marking safe");
+        await postData.markApproved();
+        return;
+    }
     if (await postData.isPendingResponse()) {
         if (postData.sentModmailId === "") {
             const post = await context.reddit.getPostById(postData.postId);
@@ -131,6 +150,7 @@ async function handleRemove(
     event: TriggerEventType["ModAction"],
     context: TriggerContext,
 ): Promise<void> {
+    const isComment = event.action?.includes("comment");
     const postData = await resolvePostData(event, context);
     if (postData === undefined) {
         return;
@@ -142,6 +162,14 @@ async function handleRemove(
     );
     if (await postData.inCategory(PostCategory.Filtered)) {
         log.info("Post already marked filtered");
+        return;
+    }
+    if (
+        isComment &&
+        event.targetComment?.author == (await context.reddit.getAppUser()).id
+    ) {
+        log.info("Bot comment was removed. Marking post safe.");
+        await postData.markSafe();
         return;
     }
     await postData.markRemoved();

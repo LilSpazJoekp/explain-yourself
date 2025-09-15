@@ -304,7 +304,9 @@ export class PostData {
     }
 
     async isPendingResponse(): Promise<boolean> {
-        return this.responseMessageId === "";
+        return (
+            !(await this.inCategory(PostCategory.Safe)) && this.responseMessageId === ""
+        );
     }
 
     async leavePrivateModNote(noteType: PrivateNote): Promise<void> {
@@ -313,6 +315,16 @@ export class PostData {
             body: noteType.valueOf(),
             isInternal: true,
         });
+        if (
+            (
+                await this.context.reddit.modMail.getConversation({
+                    conversationId: this.sentModmailId,
+                })
+            ).conversation?.isInternal
+        ) {
+            this.log.info("Conversation is internal. Not archiving.");
+            return;
+        }
         await withRetries(() =>
             this.context.reddit.modMail.archiveConversation(this.sentModmailId),
         );
@@ -476,6 +488,16 @@ export class PostData {
                 break;
         }
         if (!body) {
+            if (
+                (
+                    await this.context.reddit.modMail.getConversation({
+                        conversationId: this.sentModmailId,
+                    })
+                ).conversation?.isInternal
+            ) {
+                this.log.info("Conversation is internal. Not archiving.");
+                return;
+            }
             await withRetries(() =>
                 this.context.reddit.modMail.archiveConversation(this.sentModmailId),
             );
@@ -486,6 +508,16 @@ export class PostData {
             body,
             isAuthorHidden: true,
         });
+        if (
+            (
+                await this.context.reddit.modMail.getConversation({
+                    conversationId: this.sentModmailId,
+                })
+            ).conversation?.isInternal
+        ) {
+            this.log.info("Conversation is internal. Not archiving.");
+            return;
+        }
         await withRetries(() =>
             this.context.reddit.modMail.archiveConversation(this.sentModmailId),
         );
@@ -532,6 +564,16 @@ export class PostData {
             await this.writeToRedis();
         }
         try {
+            if (
+                (
+                    await this.context.reddit.modMail.getConversation({
+                        conversationId: this.sentModmailId,
+                    })
+                ).conversation?.isInternal
+            ) {
+                this.log.info("Conversation is internal. Not archiving.");
+                return;
+            }
             await withRetries(() =>
                 this.context.reddit.modMail.archiveConversation(
                     conversationData.conversation.id as string,

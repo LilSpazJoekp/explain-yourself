@@ -82,8 +82,12 @@ After the post has been removed:
 If the post is filtered by AutoModerator and then approved by a moderator, the post will be treated as a new post and
 the app will act on it as if it was just created.
 
-If the post or bot comment is removed then approved by a moderator, the post will accept explanations if an explanation
-was not already accepted prior to removal.
+If the post or app's comment is removed then approved by a moderator, the post will accept explanations if an
+explanation was not already accepted prior to removal.
+
+If the app's comment is removed, the post will be considered safe and the app will stop enforcing checks.
+
+If the post author is a moderator and the post is approved, consider the post as safe and stop enforcing checks.
 
 ## Configuration
 
@@ -300,9 +304,15 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.2.11
+
+- When app comment is removed, consider the post as safe and stop enforcing checks.
+- Don't attempt to archive mod only modmail conversations.
+- If the post author is a moderator and the post is approved, consider the post as safe and stop enforcing checks.
+
 ### 1.2.5
 
-- Move post ID to end of the message subject.
+- Move post ID to the end of the message subject.
 
 ### 1.2.4
 
