@@ -304,11 +304,12 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
-## 1.2.11
+## 1.2.13
 
 - When app comment is removed, consider the post as safe and stop enforcing checks.
 - Don't attempt to archive mod only modmail conversations.
 - If the post author is a moderator and the post is approved, consider the post as safe and stop enforcing checks.
+- Don't leave a private mod note if the modmail conversation doesn't exist.
 
 ### 1.2.5
 

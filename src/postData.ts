@@ -310,6 +310,10 @@ export class PostData {
     }
 
     async leavePrivateModNote(noteType: PrivateNote): Promise<void> {
+        if (!this.sentModmailId) {
+            this.log.error("No modmail to leave a note on");
+            return;
+        }
         await this.context.reddit.modMail.reply({
             conversationId: this.sentModmailId,
             body: noteType.valueOf(),
