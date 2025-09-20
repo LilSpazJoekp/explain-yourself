@@ -287,6 +287,15 @@ Devvit.addSettings([
                 label: "Flair Settings",
                 type: "group",
             },
+            {
+                defaultValue: false,
+                helpText:
+                    "If enabled, the app will ignore posts made by moderators. Otherwise, the app will process moderator posts like any other user with the addition of a PM sent to the moderator.",
+                ...booleanField({
+                    label: "Ignore Moderators",
+                    name: "ignoreModerators",
+                }),
+            },
         ],
         helpText:
             "These settings control the conditions the post is removed/approved/marked safe/ignored.",

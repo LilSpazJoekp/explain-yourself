@@ -1,7 +1,7 @@
 import { TriggerContext, TriggerEventType } from "@devvit/public-api";
 import { parse } from "node-html-parser";
 import { CommentType, PostCategory, ResponseType } from "./_types.js";
-import { URL_REGEX } from "./consts.js";
+import { REDDIT_MENTION_REGEX, URL_REGEX } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
 import { humanDuration, resolveSettings, withRetries } from "./utils.js";
@@ -106,19 +106,21 @@ export async function handleMessage(
             humanDuration(replyDuration),
         );
     }
-    const parsedHtml = parse(bodyHtml);
+    let parsedHtml = parse(bodyHtml);
     if (parsedHtml === undefined) {
         log.error("Failed to parse HTML");
         await postData.respond({ responseType: ResponseType.Error });
         return;
     }
+
     const aTags = parsedHtml.querySelectorAll("a");
-    if (blockUrlsInExplanation && (aTags.length > 0 || body.match(URL_REGEX))) {
+    const validATags = aTags.filter((tag) => !tag.text.match(REDDIT_MENTION_REGEX))
+    if (blockUrlsInExplanation && (validATags.length > 0 || body.match(URL_REGEX))) {
         log.info("Author included one or more URLs, rejecting message");
         await postData.respond({ responseType: ResponseType.Invalid });
         return;
     }
-    if (requireUrlInExplanation && aTags.length === 0 && !body.match(URL_REGEX)) {
+    if (requireUrlInExplanation && validATags.length === 0 && !body.match(URL_REGEX)) {
         log.info("Author did not include a URL, rejecting message");
         await postData.respond({ responseType: ResponseType.Invalid });
         return;

@@ -1,10 +1,4 @@
-import {
-    Context,
-    Post,
-    Subreddit,
-    TriggerContext,
-    TriggerEventType,
-} from "@devvit/public-api";
+import { Context, TriggerContext, TriggerEventType } from "@devvit/public-api";
 import { PostCategory } from "./_types.js";
 import { WATCHED_MODLOG_ACTIONS } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
@@ -99,43 +93,110 @@ async function handleApprove(
     event: TriggerEventType["ModAction"],
     context: TriggerContext,
 ): Promise<void> {
-    const postData = await resolvePostData(event, context);
-    const subreddit: Subreddit = await context.reddit.getCurrentSubreddit();
-    if (postData === undefined) {
-        return;
-    }
     const log = logger.injectArgs(
         event.action,
         event.moderator?.name,
         event.action?.includes("link") ? event.targetPost?.id : event.targetComment?.id,
     );
-    const { allowExplanation, explanationPendingComment } = await resolveSettings(
+    if (event.targetPost === undefined) {
+        log.error("No target post found for approve action");
+        return;
+    }
+    let postData = await resolvePostData(event, context);
+    const filteredPosts = await context.redis.zScan(
+        "posts:filtered",
+        0,
+        event.targetPost?.id,
+    );
+    if (postData === undefined && filteredPosts.members.length === 0) {
+        // If no PostData, check if in filtered set to see if we need to reprocess it
+        log.info("No post data found for post");
+        return;
+    }
+    const {
+        exclusionRegex,
+        exclusionTypes,
+        postFlairIds,
+        postFlairListType,
+        allowExplanation,
+        explanationPendingComment,
+        ignoreModerators,
+    } = await resolveSettings(
         context.settings,
+        "exclusionRegex",
+        "exclusionTypes",
+        "postFlairIds",
+        "postFlairListType",
         "allowExplanation",
         "explanationPendingComment",
+        "ignoreModerators",
     );
+    const post = await context.reddit.getPostById(event.targetPost.id);
+    postData = await PostData.fromPost(context, post);
     if (await postData.inCategory(PostCategory.Safe)) {
         log.info("Post already marked as safe");
         return;
     }
-    const authorName = postData.author
-    if ((
-        await subreddit.getModerators({username: authorName}).all()
-    ).length > 0) {
-        log.info("Author is a moderator, marking safe");
-        await postData.markApproved();
-        return;
+    if (filteredPosts.members.length > 0) {
+        log.info("Post was in filtered set, reprocessing");
+        log.info("Handling post");
+        if (exclusionRegex) {
+            const regex = new RegExp(exclusionRegex, "i");
+            const toCheck = [];
+            if (exclusionTypes) {
+                if (exclusionTypes.includes("title")) {
+                    toCheck.push(post.title);
+                }
+                if (exclusionTypes.includes("body")) {
+                    toCheck.push(post.body || "");
+                }
+            }
+            if (toCheck.some((text) => regex.test(text))) {
+                log.info("Post excluded by regex");
+                return;
+            }
+        }
+
+        if (postFlairIds) {
+            const flairIds = postFlairIds.split("\n");
+            const postFlairExclusion: boolean = postFlairListType[0] === "exclusion";
+            const postFlairId = post.flair?.templateId || "";
+            if (postFlairExclusion) {
+                if (flairIds.includes(postFlairId)) {
+                    log.info("Post excluded by flair");
+                    return;
+                }
+            } else {
+                if (!flairIds.includes(postFlairId)) {
+                    log.info("Post does not have the required flair");
+                    return;
+                }
+            }
+        }
+
+        if (ignoreModerators) {
+            const authorName = post.authorName || "";
+            const subreddit = await context.reddit.getCurrentSubreddit();
+            if (
+                (await subreddit.getModerators({ username: authorName }).all()).length >
+                0
+            ) {
+                log.info("Post author is a moderator, ignoring");
+                await postData.markApproved();
+                log.info("Marked Safe");
+                return;
+            }
+        }
     }
     if (await postData.isPendingResponse()) {
+        postData.createdAt = new Date().valueOf();
         if (postData.sentModmailId === "") {
             const post = await context.reddit.getPostById(postData.postId);
-            if (await postData.inCategory(PostCategory.Filtered)) {
-                postData.createdAt = new Date().valueOf();
-            }
             await postData.initializePostSession(
                 explanationPendingComment,
                 allowExplanation,
                 post,
+                ignoreModerators,
             );
         } else {
             await postData.setCategory(PostCategory.PendingResponse);
@@ -184,12 +245,10 @@ export async function handleFilter(
         logger.error("No post found for Automoderator filter event");
         return;
     }
-    const post: Post = await context.reddit.getPostById(event.post.id);
-    const postData = await PostData.fromPost(context, post);
-    if (postData === undefined) {
-        return;
-    }
-    const log = logger.injectArgs("Automod Filtered", "AutoModerator", post);
-    await postData.markFiltered();
+    await context.redis.zAdd(`posts:filtered`, {
+        member: event.post.id,
+        score: event.post.createdAt,
+    });
+    const log = logger.injectArgs("Automod Filtered", "AutoModerator", event.post.id);
     log.info("Marked Filtered");
 }

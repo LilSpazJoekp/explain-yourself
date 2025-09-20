@@ -79,8 +79,8 @@ After the post has been removed:
 - If 'Post Removal Comment Header' is set, a comment with the contents of 'Post Removal Comment Header' will be
   prepended to the comment.
 
-If the post is filtered by AutoModerator and then approved by a moderator, the post will be treated as a new post and
-the app will act on it as if it was just created.
+If the post approved by a moderator, the post will be treated as a new post and the app will act on it as if it was just
+created.
 
 If the post or app's comment is removed then approved by a moderator, the post will accept explanations if an
 explanation was not already accepted prior to removal.
@@ -139,6 +139,8 @@ page: https://developers.reddit.com/r/<SUBREDDIT>/post-explainer
 - **Post Exclusion Regex**: Regex pattern to exclude certain posts from the app's actions.
 - **Post Exclusion Type**: The type of content to apply the exclusion regex to. Options are 'Title' or 'Body', multiple
   can be selected.
+- **Ignore Moderators**: If enabled, the app will ignore posts made by moderators. Otherwise, the app will process
+  moderator posts like any other user with the addition of a PM sent to the moderator.
 
 #### Flair Settings
 
@@ -303,6 +305,14 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 [GitHub page](https://github.com/LilSpazJoekp/explain-yourself).
 
 ## Changes
+
+## 1.3.0
+
+- Added the ability to ignore posts by moderators.
+- If a moderator submits a post, the moderator will not be sent a non-replyable PM linking to the modmail conversation
+  for response.
+- Fix a bug where user and subreddit mentions was being incorrectly interpreted as a URL.
+- Fix a bug when a filtered post is approved, the app would not correctly check eligibility again.
 
 ## 1.2.13
 

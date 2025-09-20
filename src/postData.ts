@@ -287,6 +287,7 @@ export class PostData {
         explanationPendingComment: string,
         allowExplanation: boolean,
         post: Post,
+        ignoreModerators: boolean,
     ) {
         if (explanationPendingComment) {
             const comment = await this.commentReply(CommentType.Pending);
@@ -297,6 +298,22 @@ export class PostData {
         }
         if (allowExplanation) {
             await this.sendMessage(post);
+            const subreddit = await this.context.reddit.getCurrentSubreddit();
+            if (
+                (await subreddit.getModerators({ username: this.author }).all())
+                    .length > 0
+            ) {
+                if (!ignoreModerators) {
+                    this.log.info(
+                        "Author is a moderator, sending PM with link to modmail thread",
+                    );
+                    await this.context.reddit.sendPrivateMessage({
+                        to: this.author,
+                        subject: `Re: [${this.postId}] Response Required`,
+                        text: `Please response to this modmail thread to add your explanation:\n\nhttps://mod.reddit.com/mail/all/${this.sentModmailId}`,
+                    });
+                }
+            }
         }
         await this.savePost(
             allowExplanation ? PostCategory.PendingResponse : PostCategory.Active,
@@ -347,13 +364,6 @@ export class PostData {
         await this.setCategory(PostCategory.Deleted);
         await this.writeToRedis();
         await this.leavePrivateModNote(PrivateNote.Deleted);
-    }
-
-    async markFiltered(): Promise<void> {
-        this.filtered = true;
-        await this.setCategory(PostCategory.Filtered);
-        await this.writeToRedis();
-        await this.leavePrivateModNote(PrivateNote.Filtered);
     }
 
     async markRemoved(): Promise<void> {

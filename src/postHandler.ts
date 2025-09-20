@@ -30,6 +30,7 @@ export async function handlePost(
         postFlairListType,
         allowExplanation,
         explanationPendingComment,
+        ignoreModerators,
     } = await resolveSettings(
         settings,
         "exclusionRegex",
@@ -38,6 +39,7 @@ export async function handlePost(
         "postFlairListType",
         "allowExplanation",
         "explanationPendingComment",
+        "ignoreModerators",
     );
     if (exclusionRegex) {
         const regex = new RegExp(exclusionRegex, "i");
@@ -73,6 +75,17 @@ export async function handlePost(
         }
     }
 
+    if (ignoreModerators) {
+        const authorName = event.author?.name || "";
+        const subreddit = await reddit.getCurrentSubreddit();
+        if (
+            (await subreddit.getModerators({ username: authorName }).all()).length > 0
+        ) {
+            log.info("Post author is a moderator, ignoring");
+            return;
+        }
+    }
+
     const postData = await PostData.fromPost(context, post);
     if (await postData.inCategory(PostCategory.Filtered)) {
         log.info("Post already marked filtered");
@@ -82,6 +95,7 @@ export async function handlePost(
         explanationPendingComment,
         allowExplanation,
         post,
+        ignoreModerators,
     );
 }
 
