@@ -292,6 +292,7 @@ export async function checkResponses(
                 (postData) =>
                     replyDuration > 0 && postData.olderThan(replyDuration, now),
             )
+            .filter((postData: PostData) => !postData.responseMessageId)
             .map(async (postData) => {
                 log.info("[%s] Removing post due to no response", postData.postId);
                 await reddit.remove(postData.postId, false);

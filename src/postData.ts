@@ -282,6 +282,7 @@ export class PostData {
      * @param explanationPendingComment - The comment to be posted if an explanation is pending.
      * @param allowExplanation - Whether to allow sending an explanation message.
      * @param post - The post to be processed.
+     * @param ignoreModerators - Whether to ignore moderators when sending messages.
      */
     async initializePostSession(
         explanationPendingComment: string,
@@ -602,7 +603,9 @@ export class PostData {
         await this.#injectLogArgs();
         this.log.info(`Moving post ${this.postId} to ${newCategory}`);
         await Promise.all(
-            Object.values(PostCategory).map(
+            Object.values(PostCategory)
+                .filter((category) => category !== PostCategory.Seen)
+                .map(
                 async (category) =>
                     await this.context.redis.zRem(`posts:${category}`, [this.postId]),
             ),

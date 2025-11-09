@@ -306,6 +306,16 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.3.9
+
+- Fix an issue where a post could get stuck in a loop of being removed when a moderator approves a post after removal.
+- Fix an issue where the bot receives an duplicate PostCreate event it will cause the post to be in an invalid state
+  where it can't be approved.
+
+## 1.3.1
+
+- Fix an issue with duplicate comments when a post is approved after being removed.
+
 ## 1.3.0
 
 - Added the ability to ignore posts by moderators.

@@ -109,6 +109,7 @@ export enum PostCategory {
     PendingResponse = "pendingResponse",
     Removed = "removed",
     Safe = "safe",
+    Seen = "seen",
 }
 
 export enum ResponseType {

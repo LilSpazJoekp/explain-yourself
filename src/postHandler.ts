@@ -22,7 +22,6 @@ export async function handlePost(
         post.id,
         event.post.title,
     );
-    log.info("Handling post");
     const {
         exclusionRegex,
         exclusionTypes,
@@ -87,6 +86,11 @@ export async function handlePost(
     }
 
     const postData = await PostData.fromPost(context, post);
+
+    if (await postData.inCategory(PostCategory.Seen)) {
+        log.info("Post already processed");
+        return;
+    }
     if (await postData.inCategory(PostCategory.Filtered)) {
         log.info("Post already marked filtered");
         return;
@@ -97,6 +101,7 @@ export async function handlePost(
         post,
         ignoreModerators,
     );
+    await postData.setCategory(PostCategory.Seen)
 }
 
 export async function handleDeletion(

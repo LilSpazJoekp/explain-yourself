@@ -1,25 +1,32 @@
 {
-  "dependencies": {
-    "@devvit/protos": "0.11.18",
-    "@devvit/public-api": "0.11.18",
-    "devvit": "0.11.18",
-    "node-html-parser": "^6.1.13"
-  },
-  "devDependencies": {
-    "prettier": "^3.3.3",
-    "@eslint/js": "^9.15.0",
-    "eslint": "^9.15.0",
-    "globals": "^15.12.0",
-    "typescript": "5.8.3",
-    "typescript-eslint": "^8.15.0"
-  },
-  "license": "BSD-3-Clause",
-  "name": "post-explainer",
-  "private": true,
-  "type": "module",
-  "version": "0.0.0",
-  "prettier": {
-    "printWidth": 88,
-    "tabWidth": 4
-  }
+    "dependencies": {
+        "@devvit/protos": "0.11.18",
+        "@devvit/public-api": "0.11.18",
+        "devvit": "0.11.18",
+        "node-html-parser": "^6.1.13"
+    },
+    "scripts": {
+        "publish": "devvit publish --public",
+        "publish-private": "devvit publish",
+        "upload-major": "devvit upload --bump major",
+        "upload-minor": "devvit upload --bump minor",
+        "upload-patch": "devvit upload --bump patch"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.15.0",
+        "eslint": "^9.15.0",
+        "globals": "^15.12.0",
+        "prettier": "^3.3.3",
+        "typescript": "5.8.3",
+        "typescript-eslint": "^8.15.0"
+    },
+    "license": "BSD-3-Clause",
+    "name": "post-explainer",
+    "private": true,
+    "type": "module",
+    "version": "0.0.0",
+    "prettier": {
+        "printWidth": 88,
+        "tabWidth": 4
+    }
 }

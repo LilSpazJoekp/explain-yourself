@@ -131,15 +131,28 @@ async function handleApprove(
         "explanationPendingComment",
         "ignoreModerators",
     );
-    const post = await context.reddit.getPostById(event.targetPost.id);
-    postData = await PostData.fromPost(context, post);
+    let post;
+    if (event.targetPost.id) {
+        post = await context.reddit.getPostById(event.targetPost.id);
+    } else {
+        if (event.targetComment === undefined) {
+            log.error("No target comment found for approve action");
+            return;
+        }
+        post = await context.reddit.getPostById(
+            (await context.reddit.getCommentById(event.targetComment.id)).parentId,
+        );
+    }
+    if (postData === undefined) {
+        // If no PostData, but in filtered set, rebuild it
+        postData = await PostData.fromPost(context, post);
+    }
     if (await postData.inCategory(PostCategory.Safe)) {
         log.info("Post already marked as safe");
         return;
     }
     if (filteredPosts.members.length > 0) {
         log.info("Post was in filtered set, reprocessing");
-        log.info("Handling post");
         if (exclusionRegex) {
             const regex = new RegExp(exclusionRegex, "i");
             const toCheck = [];
@@ -190,6 +203,7 @@ async function handleApprove(
     }
     if (await postData.isPendingResponse()) {
         postData.createdAt = new Date().valueOf();
+        await postData.writeToRedis()
         if (postData.sentModmailId === "") {
             const post = await context.reddit.getPostById(postData.postId);
             await postData.initializePostSession(
@@ -198,6 +212,9 @@ async function handleApprove(
                 post,
                 ignoreModerators,
             );
+        } else if (postData.responseMessageId) {
+            await postData.markApproved();
+            log.info("Marked Safe");
         } else {
             await postData.setCategory(PostCategory.PendingResponse);
         }
