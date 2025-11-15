@@ -306,6 +306,11 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.3.10
+
+- Add more logging to debug issues.
+- General code cleanup.
+
 ## 1.3.9
 
 - Fix an issue where a post could get stuck in a loop of being removed when a moderator approves a post after removal.

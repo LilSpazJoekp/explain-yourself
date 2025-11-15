@@ -1,6 +1,6 @@
 import { Comment, Context, JobContext, Post, TriggerContext } from "@devvit/public-api";
 import { CommentType, PlaceholderField, PostCategory, ResponseType } from "./_types.js";
-import { PrivateNote } from "./consts.js";
+import { MAX_MESSAGE_SUBJECT_LENGTH, MAX_REPORT_REASON_LENGTH, PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import {
     humanDuration,
@@ -90,25 +90,26 @@ export class PostData {
         if ((await context.settings.get("debugMode")) === "true") {
             console.log(category, results);
         }
-        return (
-            await Promise.resolve(
-                Promise.all(
-                    results.members.map(async (item) => {
-                        const postData = await PostData.fromPostId(
-                            context,
-                            item.member,
-                        );
-                        if (fetchPosts) {
-                            await postData?.resolvePost();
-                        }
-                        if (fetchComments) {
-                            await postData?.resolveComment();
-                        }
-                        return postData;
-                    }),
-                ),
-            )
-        ).filter((item) => item !== undefined) as PostData[];
+        const postDataItems = await Promise.all(
+            results.members.map(async (item) => {
+                try {
+                    const postData = await PostData.fromPostId(context, item.member);
+                    if (!postData) return undefined;
+
+                    if (fetchPosts) {
+                        await postData.resolvePost();
+                    }
+                    if (fetchComments) {
+                        await postData.resolveComment();
+                    }
+                    return postData;
+                } catch (error) {
+                    console.error(`Failed to fetch post data for ${item.member}:`, error);
+                    return undefined;
+                }
+            }),
+        );
+        return postDataItems.filter((item): item is PostData => item !== undefined);
     }
 
     static async fromPost(
@@ -177,6 +178,7 @@ export class PostData {
     ): Promise<Comment | undefined> {
         let text = "";
         let comment: Comment | undefined = undefined;
+        this.log.info(`Replying with Comment${commentType}`);
         if (this.commentId) {
             comment = await this.context.reddit.getCommentById(this.commentId);
         }
@@ -309,9 +311,9 @@ export class PostData {
                         "Author is a moderator, sending PM with link to modmail thread",
                     );
                     await this.context.reddit.sendPrivateMessage({
-                        to: this.author,
+                        to: post.authorName,
                         subject: `Re: [${this.postId}] Response Required`,
-                        text: `Please response to this modmail thread to add your explanation:\n\nhttps://mod.reddit.com/mail/all/${this.sentModmailId}`,
+                        text: `Please respond to this modmail thread to add your explanation:\n\nhttps://mod.reddit.com/mail/all/${this.sentModmailId}`,
                     });
                 }
             }
@@ -443,7 +445,7 @@ export class PostData {
         await this.context.reddit.report(this.comment, {
             reason: (
                 await this.#replacePlaceholders(PlaceholderField.reportReason)
-            ).slice(0, 100),
+            ).slice(0, MAX_REPORT_REASON_LENGTH),
         });
         this.log.info("Comment reported");
     }
@@ -503,39 +505,20 @@ export class PostData {
                 break;
         }
         if (!body) {
-            if (
-                (
-                    await this.context.reddit.modMail.getConversation({
-                        conversationId: this.sentModmailId,
-                    })
-                ).conversation?.isInternal
-            ) {
-                this.log.info("Conversation is internal. Not archiving.");
-                return;
-            }
-            await withRetries(() =>
-                this.context.reddit.modMail.archiveConversation(this.sentModmailId),
-            );
+            await this.#archiveConversationIfNotInternal(this.sentModmailId);
             return;
         }
-        await this.context.reddit.modMail.reply({
-            conversationId: this.sentModmailId,
-            body,
-            isAuthorHidden: true,
-        });
-        if (
-            (
-                await this.context.reddit.modMail.getConversation({
-                    conversationId: this.sentModmailId,
-                })
-            ).conversation?.isInternal
-        ) {
-            this.log.info("Conversation is internal. Not archiving.");
+        try {
+            await this.context.reddit.modMail.reply({
+                conversationId: this.sentModmailId,
+                body,
+                isAuthorHidden: true,
+            });
+        } catch (error) {
+            this.log.error("Failed to send modmail reply", error);
             return;
         }
-        await withRetries(() =>
-            this.context.reddit.modMail.archiveConversation(this.sentModmailId),
-        );
+        await this.#archiveConversationIfNotInternal(this.sentModmailId);
     }
 
     async savePost(category: PostCategory): Promise<void> {
@@ -552,7 +535,7 @@ export class PostData {
         const subject =
             (await this.#replacePlaceholders(PlaceholderField.messageSubject)).slice(
                 0,
-                100 - postIdPrefix.length,
+                MAX_MESSAGE_SUBJECT_LENGTH - postIdPrefix.length,
             ) + postIdPrefix;
         const body = await this.#replacePlaceholders(PlaceholderField.messageBody);
         let conversationData;
@@ -634,6 +617,26 @@ export class PostData {
         await this.context.redis.hSet(this.postId, data);
     }
 
+    async #archiveConversationIfNotInternal(conversationId: string): Promise<void> {
+        try {
+            const { conversation } = await this.context.reddit.modMail.getConversation({
+                conversationId,
+            });
+
+            if (conversation?.isInternal) {
+                this.log.info("Conversation is internal. Not archiving.");
+                return;
+            }
+
+            await withRetries(() =>
+                this.context.reddit.modMail.archiveConversation(conversationId),
+            );
+        } catch (error) {
+            this.log.error("Failed to check or archive conversation", error);
+        }
+    }
+
+
     async #associateIdWithPost(
         idType: "conversation" | "comment",
         otherId: string,
@@ -662,7 +665,7 @@ export class PostData {
             /\{explanation}/g,
             spoilerExplanation
                 ? this.#spoiler(explanation)
-                : "> " + explanation.replace("\n", "\n> "),
+                : "> " + explanation.replace(/\n/g, "\n> "),
         );
     }
 
@@ -729,8 +732,8 @@ export class PostData {
     }
 
     #spoiler(text: string) {
-        text = text.replace(">!", "\\>\\!");
-        text = text.replace("!<", "\\!\\<");
+        text = text.replace(/>!/g, "\\>\\!");
+        text = text.replace(/!</g, "\\!\\<");
         const parts = text.split("\n\n");
         return parts.map((part) => `>!${part}!<`).join("\n\n");
     }

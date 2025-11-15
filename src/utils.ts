@@ -213,7 +213,7 @@ export function humanDuration(minutes: number): string {
     if (remainingMinutes > 0) {
         parts.push(`${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`);
     }
-    return parts.join(" ");
+    return parts.length > 0 ? parts.join(" ") : "0 minutes";
 }
 
 export async function withRetries<T>(
@@ -223,10 +223,7 @@ export async function withRetries<T>(
     let attempt = 0;
     while (true) {
         try {
-            if (fn instanceof Promise) {
-                return await fn;
-            }
-            return fn();
+            return await fn();
         } catch (error) {
             attempt++;
             console.debug(`Attempt ${attempt} failed: ${error}`);
@@ -234,6 +231,8 @@ export async function withRetries<T>(
                 console.error(`All ${retries} retries failed.`);
                 throw error;
             }
+            console.log(`Waiting ${attempt} seconds before retrying...`);
+            await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
         }
         console.debug(`Retrying attempt ${attempt + 1}...`);
     }

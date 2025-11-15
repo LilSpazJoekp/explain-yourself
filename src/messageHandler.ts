@@ -32,16 +32,16 @@ export async function handleMessage(
         context,
         conversationId,
     );
-    if (event.messageAuthor.name !== postData?.author) {
-        log.info(
-            "Post data author (%s) does not match message author (%s), ignoring",
-            postData?.author,
-            event.messageAuthor.name,
-        );
+    if (!postData) {
+        log.error("No post data found for message");
         return;
     }
-    if (postData === undefined) {
-        log.error("No post data found for message");
+    if (event.messageAuthor.name !== postData.author) {
+        log.info(
+            "Post data author (%s) does not match message author (%s), ignoring",
+            postData.author,
+            event.messageAuthor.name,
+        );
         return;
     }
     if (postData.responseMessageId !== "") {
@@ -106,7 +106,7 @@ export async function handleMessage(
             humanDuration(replyDuration),
         );
     }
-    let parsedHtml = parse(bodyHtml);
+    const parsedHtml = parse(bodyHtml);
     if (parsedHtml === undefined) {
         log.error("Failed to parse HTML");
         await postData.respond({ responseType: ResponseType.Error });
@@ -114,7 +114,7 @@ export async function handleMessage(
     }
 
     const aTags = parsedHtml.querySelectorAll("a");
-    const validATags = aTags.filter((tag) => !tag.text.match(REDDIT_MENTION_REGEX))
+    const validATags = aTags.filter((tag) => !tag.text.match(REDDIT_MENTION_REGEX));
     if (blockUrlsInExplanation && (validATags.length > 0 || body.match(URL_REGEX))) {
         log.info("Author included one or more URLs, rejecting message");
         await postData.respond({ responseType: ResponseType.Invalid });
@@ -158,16 +158,6 @@ export async function handleMessage(
             replyLength: cleanedReply.length,
             responseType: ResponseType.TooShort,
         });
-    }
-    if (
-        (
-            await reddit.modMail.getConversation({
-                conversationId: postData.sentModmailId,
-            })
-        ).conversation?.isInternal
-    ) {
-        log.info("Conversation is internal. Not archiving.");
-        return;
     }
     await withRetries(() => reddit.modMail.archiveConversation(conversationId));
 }

@@ -4,7 +4,7 @@ import { PostData } from "./postData.js";
 export const responseLookupForm = Devvit.createForm(
     (data) => ({
         name: "responseLookup",
-        title: "Response Conversation Look",
+        title: "Response Conversation Lookup",
         fields: [
             {
                 defaultValue: data.postId ? data.postId.split("_")[1] : "",

@@ -153,6 +153,7 @@ async function handleApprove(
     }
     if (filteredPosts.members.length > 0) {
         log.info("Post was in filtered set, reprocessing");
+        await context.redis.zRem("posts:filtered", [post.id]);
         if (exclusionRegex) {
             const regex = new RegExp(exclusionRegex, "i");
             const toCheck = [];
@@ -172,7 +173,7 @@ async function handleApprove(
 
         if (postFlairIds) {
             const flairIds = postFlairIds.split("\n");
-            const postFlairExclusion: boolean = postFlairListType[0] === "exclusion";
+            const postFlairExclusion: boolean = postFlairListType?.[0] === "exclusion";
             const postFlairId = post.flair?.templateId || "";
             if (postFlairExclusion) {
                 if (flairIds.includes(postFlairId)) {
@@ -203,7 +204,7 @@ async function handleApprove(
     }
     if (await postData.isPendingResponse()) {
         postData.createdAt = new Date().valueOf();
-        await postData.writeToRedis()
+        await postData.writeToRedis();
         if (postData.sentModmailId === "") {
             const post = await context.reddit.getPostById(postData.postId);
             await postData.initializePostSession(

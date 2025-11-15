@@ -5,6 +5,8 @@ export const JOB_WATCHER = "job_watcher";
 export const POST_WATCHER = "post_watcher";
 export const RESPONSE_WATCHER = "response_watcher";
 export const JOBS = [COMMENT_WATCHER, POST_WATCHER, RESPONSE_WATCHER];
+export const MAX_REPORT_REASON_LENGTH = 100;
+export const MAX_MESSAGE_SUBJECT_LENGTH = 100;
 export const URL_REGEX =
     /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()[\]{};:'".,<>?«»“”‘’]))/g;
 

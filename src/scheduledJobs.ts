@@ -154,7 +154,6 @@ export async function checkComments(
             .map(async (postData) => {
                 log.info("[%s] Setting post as safe", postData.postId);
                 await postData.markSafe();
-                await postData.commentReply(CommentType.Safe);
             })
             .concat(
                 toApprove.map(async (postData) => {
@@ -164,7 +163,6 @@ export async function checkComments(
                     );
                     await postData.post.approve();
                     await postData.markApproved();
-                    await postData.commentReply(CommentType.Safe);
                 }),
             )
             .concat(
@@ -249,7 +247,6 @@ export async function checkPosts(
         toMarkSafe.map(async (postData) => {
             log.info("Setting post %s as safe due to post score", postData.postId);
             await postData.markSafe();
-            await postData.commentReply(CommentType.Safe);
         }),
     );
     await Promise.all(
@@ -257,7 +254,6 @@ export async function checkPosts(
             log.info("Approving post %s and setting as safe", postData.postId);
             await postData.post.approve();
             await postData.markApproved();
-            await postData.commentReply(CommentType.Safe);
         }),
     );
 }
@@ -351,10 +347,13 @@ export async function ensureJobs(
         return;
     }
     log.info("Missing jobs: %s", missingJobs.join(", "));
-    await Promise.all(
-        missingJobs.map(async (job) => {
+    for (const job of missingJobs) {
+        try {
             log.info("Setting up %s", job);
             await scheduler.runJob({ cron: CHECK_CRON, name: job });
-        }),
-    );
+            log.info("Successfully scheduled job: %s", job);
+        } catch (error) {
+            log.error("Failed to schedule job %s:", job, error);
+        }
+    }
 }

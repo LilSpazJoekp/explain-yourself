@@ -59,7 +59,7 @@ export async function handlePost(
 
     if (postFlairIds) {
         const flairIds = postFlairIds.split("\n");
-        const postFlairExclusion: boolean = postFlairListType[0] === "exclusion";
+        const postFlairExclusion: boolean = postFlairListType?.[0] === "exclusion";
         const postFlairId = post.flair?.templateId || "";
         if (postFlairExclusion) {
             if (flairIds.includes(postFlairId)) {
@@ -101,7 +101,7 @@ export async function handlePost(
         post,
         ignoreModerators,
     );
-    await postData.setCategory(PostCategory.Seen)
+    await postData.setCategory(PostCategory.Seen);
 }
 
 export async function handleDeletion(
