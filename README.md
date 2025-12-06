@@ -141,6 +141,9 @@ page: https://developers.reddit.com/r/<SUBREDDIT>/post-explainer
   can be selected.
 - **Ignore Moderators**: If enabled, the app will ignore posts made by moderators. Otherwise, the app will process
   moderator posts like any other user with the addition of a PM sent to the moderator.
+- **Ignore Filtered Posts**: If enabled, the app will ignore posts that were filtered by AutoModerator. Otherwise, the
+  app will process filtered posts like any other post. If the post is approved by a moderator, the app will treat it as
+  a new post and process it accordingly.
 
 #### Flair Settings
 
@@ -305,6 +308,12 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 [GitHub page](https://github.com/LilSpazJoekp/explain-yourself).
 
 ## Changes
+
+## 1.4.0
+
+- Add the ability to still process posts filtered by AutoModerator.
+- Fix an issue where multiple comments and/or modmail conversations could be created for the same post if the post was
+  approved after being filtered by AutoModerator.
 
 ## 1.3.10
 

@@ -1,6 +1,17 @@
-import { Comment, Context, JobContext, Post, TriggerContext } from "@devvit/public-api";
+import {
+    Comment,
+    Context,
+    JobContext,
+    Post,
+    RedisClient,
+    TriggerContext,
+} from "@devvit/public-api";
 import { CommentType, PlaceholderField, PostCategory, ResponseType } from "./_types.js";
-import { MAX_MESSAGE_SUBJECT_LENGTH, MAX_REPORT_REASON_LENGTH, PrivateNote } from "./consts.js";
+import {
+    MAX_MESSAGE_SUBJECT_LENGTH,
+    MAX_REPORT_REASON_LENGTH,
+    PrivateNote,
+} from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import {
     humanDuration,
@@ -104,7 +115,10 @@ export class PostData {
                     }
                     return postData;
                 } catch (error) {
-                    console.error(`Failed to fetch post data for ${item.member}:`, error);
+                    console.error(
+                        `Failed to fetch post data for ${item.member}:`,
+                        error,
+                    );
                     return undefined;
                 }
             }),
@@ -131,11 +145,33 @@ export class PostData {
         postId: string,
     ): Promise<PostData | undefined> {
         const { redis } = context;
-        const data: Record<keyof PostData, string> = await redis.hGetAll(postId);
-        if (Object.keys(data).length === 0) {
+        const postData = new PostData(context);
+        await this.loadFromRedis(postData, redis, postId, context);
+        return postData;
+    }
+
+    static async getPostDataByConversationId(
+        context: Context | TriggerContext,
+        conversationId: string,
+    ): Promise<PostData | undefined> {
+        const { redis } = context;
+        const postId = await redis.hGet(`conversation:${conversationId}`, "postId");
+        if (postId === undefined) {
             return undefined;
         }
-        const postData = new PostData(context);
+        return await PostData.fromPostId(context, postId);
+    }
+
+    private static async loadFromRedis(
+        postData: PostData,
+        redis: RedisClient,
+        postId: string,
+        context: Context | TriggerContext,
+    ): Promise<void> {
+        const data: Record<keyof PostData, string> = await redis.hGetAll(postId);
+        if (Object.keys(data).length === 0) {
+            return;
+        }
         const keys = Object.keys(data) as (keyof PostData)[];
         keys.forEach((key: keyof PostData) => {
             if (
@@ -153,19 +189,6 @@ export class PostData {
         });
         postData.postId = postId;
         postData.log._debugMode = (await context.settings.get("debugMode")) === "true";
-        return postData;
-    }
-
-    static async getPostDataByConversationId(
-        context: Context | TriggerContext,
-        conversationId: string,
-    ): Promise<PostData | undefined> {
-        const { redis } = context;
-        const postId = await redis.hGet(`conversation:${conversationId}`, "postId");
-        if (postId === undefined) {
-            return undefined;
-        }
-        return await PostData.fromPostId(context, postId);
     }
 
     age(now: number | undefined = undefined): number {
@@ -292,32 +315,49 @@ export class PostData {
         post: Post,
         ignoreModerators: boolean,
     ) {
+        await PostData.loadFromRedis(
+            this,
+            this.context.redis,
+            this.postId,
+            this.context,
+        );
         if (explanationPendingComment) {
-            const comment = await this.commentReply(CommentType.Pending);
-            if (comment === undefined) {
-                this.log.error("Failed to comment");
-                return;
-            }
-        }
-        if (allowExplanation) {
-            await this.sendMessage(post);
-            const subreddit = await this.context.reddit.getCurrentSubreddit();
-            if (
-                (await subreddit.getModerators({ username: this.author }).all())
-                    .length > 0
-            ) {
-                if (!ignoreModerators) {
-                    this.log.info(
-                        "Author is a moderator, sending PM with link to modmail thread",
-                    );
-                    await this.context.reddit.sendPrivateMessage({
-                        to: post.authorName,
-                        subject: `Re: [${this.postId}] Response Required`,
-                        text: `Please respond to this modmail thread to add your explanation:\n\nhttps://mod.reddit.com/mail/all/${this.sentModmailId}`,
-                    });
+            if (this.commentId) {
+                this.log.info(
+                    "Comment already exists, skipping adding pending comment",
+                );
+            } else {
+                const comment = await this.commentReply(CommentType.Pending);
+                if (comment === undefined) {
+                    this.log.error("Failed to comment");
+                    return;
                 }
             }
         }
+        if (allowExplanation) {
+            if (this.sentModmailId) {
+                this.log.info("Modmail already sent, skipping sending message");
+            } else {
+                await this.sendMessage(post);
+                const subreddit = await this.context.reddit.getCurrentSubreddit();
+                if (
+                    (await subreddit.getModerators({ username: this.author }).all())
+                        .length > 0
+                ) {
+                    if (!ignoreModerators) {
+                        this.log.info(
+                            "Author is a moderator, sending PM with link to modmail thread",
+                        );
+                        await this.context.reddit.sendPrivateMessage({
+                            to: post.authorName,
+                            subject: `Re: [${this.postId}] Response Required`,
+                            text: `Please respond to this modmail thread to add your explanation:\n\nhttps://mod.reddit.com/mail/all/${this.sentModmailId}`,
+                        });
+                    }
+                }
+            }
+        }
+        await this.setCategory(PostCategory.Seen);
         await this.savePost(
             allowExplanation ? PostCategory.PendingResponse : PostCategory.Active,
         );
@@ -585,14 +625,18 @@ export class PostData {
     async setCategory(newCategory: PostCategory): Promise<void> {
         await this.#injectLogArgs();
         this.log.info(`Moving post ${this.postId} to ${newCategory}`);
-        await Promise.all(
-            Object.values(PostCategory)
-                .filter((category) => category !== PostCategory.Seen)
-                .map(
-                async (category) =>
-                    await this.context.redis.zRem(`posts:${category}`, [this.postId]),
-            ),
-        );
+        if (newCategory !== PostCategory.Seen) {
+            await Promise.all(
+                Object.values(PostCategory)
+                    .filter((category) => category !== PostCategory.Seen)
+                    .map(
+                        async (category) =>
+                            await this.context.redis.zRem(`posts:${category}`, [
+                                this.postId,
+                            ]),
+                    ),
+            );
+        }
         await this.context.redis.zAdd(`posts:${newCategory}`, {
             member: this.postId,
             score: this.createdAt,
@@ -635,7 +679,6 @@ export class PostData {
             this.log.error("Failed to check or archive conversation", error);
         }
     }
-
 
     async #associateIdWithPost(
         idType: "conversation" | "comment",

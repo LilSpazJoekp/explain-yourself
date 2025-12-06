@@ -20,6 +20,7 @@ export interface ExplainYourselfSettings {
     explanationTooLateMessageBody: string;
     explanationTooShortMessageBody: string;
     ignoreModerators: boolean;
+    ignoreFilteredPosts: boolean;
     lateReplyDuration: number;
     lockComment: boolean;
     markSafeWithCommentScore: boolean;

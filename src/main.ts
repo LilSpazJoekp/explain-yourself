@@ -136,6 +136,7 @@ Devvit.addSettings([
                 label: "Safe Settings",
                 type: "group",
             },
+
             {
                 fields: [
                     {
@@ -294,6 +295,15 @@ Devvit.addSettings([
                 ...booleanField({
                     label: "Ignore Moderators",
                     name: "ignoreModerators",
+                }),
+            },
+            {
+                defaultValue: false,
+                helpText:
+                    "If enabled, the app will ignore posts that were filtered by AutoModerator. Otherwise, the app will process filtered posts like any other post.",
+                ...booleanField({
+                    label: "Ignore Filtered Posts",
+                    name: "ignoreFilteredPosts",
                 }),
             },
         ],

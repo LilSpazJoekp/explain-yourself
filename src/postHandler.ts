@@ -3,7 +3,7 @@ import { TriggerContext, TriggerEventType } from "@devvit/public-api";
 import { PostCategory } from "./_types.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
-import { resolveSettings } from "./utils.js";
+import { checkFlair, checkRegex, resolveSettings } from "./utils.js";
 
 const logger = new PrefixLogger("Post Handler | %s | u/%s | postId: %s | title: %s");
 
@@ -30,6 +30,7 @@ export async function handlePost(
         allowExplanation,
         explanationPendingComment,
         ignoreModerators,
+        ignoreFilteredPosts,
     } = await resolveSettings(
         settings,
         "exclusionRegex",
@@ -39,40 +40,11 @@ export async function handlePost(
         "allowExplanation",
         "explanationPendingComment",
         "ignoreModerators",
+        "ignoreFilteredPosts",
     );
-    if (exclusionRegex) {
-        const regex = new RegExp(exclusionRegex, "i");
-        const toCheck = [];
-        if (exclusionTypes) {
-            if (exclusionTypes.includes("title")) {
-                toCheck.push(post.title);
-            }
-            if (exclusionTypes.includes("body")) {
-                toCheck.push(post.body || "");
-            }
-        }
-        if (toCheck.some((text) => regex.test(text))) {
-            log.info("Post excluded by regex");
-            return;
-        }
-    }
+    if (checkRegex(exclusionRegex, exclusionTypes, post, log)) return;
 
-    if (postFlairIds) {
-        const flairIds = postFlairIds.split("\n");
-        const postFlairExclusion: boolean = postFlairListType?.[0] === "exclusion";
-        const postFlairId = post.flair?.templateId || "";
-        if (postFlairExclusion) {
-            if (flairIds.includes(postFlairId)) {
-                log.info("Post excluded by flair");
-                return;
-            }
-        } else {
-            if (!flairIds.includes(postFlairId)) {
-                log.info("Post does not have the required flair");
-                return;
-            }
-        }
-    }
+    if (checkFlair(postFlairIds, postFlairListType, post, log)) return;
 
     if (ignoreModerators) {
         const authorName = event.author?.name || "";
@@ -91,8 +63,8 @@ export async function handlePost(
         log.info("Post already processed");
         return;
     }
-    if (await postData.inCategory(PostCategory.Filtered)) {
-        log.info("Post already marked filtered");
+    if ((await postData.inCategory(PostCategory.Filtered)) && ignoreFilteredPosts) {
+        log.info("Post is filtered and ignoring filtered posts is enabled, ignoring");
         return;
     }
     await postData.initializePostSession(
@@ -101,7 +73,6 @@ export async function handlePost(
         post,
         ignoreModerators,
     );
-    await postData.setCategory(PostCategory.Seen);
 }
 
 export async function handleDeletion(

@@ -3,7 +3,7 @@ import { PostCategory } from "./_types.js";
 import { WATCHED_MODLOG_ACTIONS } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
-import { resolveSettings } from "./utils.js";
+import { checkFlair, checkRegex, resolveSettings } from "./utils.js";
 
 const logger = new PrefixLogger(
     "ModLog Handler | action: %s | Mod: u/%s | targetId: %s",
@@ -152,41 +152,18 @@ async function handleApprove(
         return;
     }
     if (filteredPosts.members.length > 0) {
-        log.info("Post was in filtered set, reprocessing");
         await context.redis.zRem("posts:filtered", [post.id]);
-        if (exclusionRegex) {
-            const regex = new RegExp(exclusionRegex, "i");
-            const toCheck = [];
-            if (exclusionTypes) {
-                if (exclusionTypes.includes("title")) {
-                    toCheck.push(post.title);
-                }
-                if (exclusionTypes.includes("body")) {
-                    toCheck.push(post.body || "");
-                }
-            }
-            if (toCheck.some((text) => regex.test(text))) {
-                log.info("Post excluded by regex");
-                return;
-            }
+        if (await postData.inCategory(PostCategory.Seen)) {
+            log.info(
+                "Post was in filtered set, but already processed. Skipping reprocessing.",
+            );
+            return;
         }
+        log.info("Post was in filtered set, reprocessing");
 
-        if (postFlairIds) {
-            const flairIds = postFlairIds.split("\n");
-            const postFlairExclusion: boolean = postFlairListType?.[0] === "exclusion";
-            const postFlairId = post.flair?.templateId || "";
-            if (postFlairExclusion) {
-                if (flairIds.includes(postFlairId)) {
-                    log.info("Post excluded by flair");
-                    return;
-                }
-            } else {
-                if (!flairIds.includes(postFlairId)) {
-                    log.info("Post does not have the required flair");
-                    return;
-                }
-            }
-        }
+        if (checkRegex(exclusionRegex, exclusionTypes, post, log)) return;
+
+        if (checkFlair(postFlairIds, postFlairListType, post, log)) return;
 
         if (ignoreModerators) {
             const authorName = post.authorName || "";

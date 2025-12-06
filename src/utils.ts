@@ -1,4 +1,9 @@
-import { SettingsClient, SettingsFormFieldValidatorEvent } from "@devvit/public-api";
+import {
+    Post,
+    SettingsClient,
+    SettingsFormFieldValidatorEvent,
+
+} from "@devvit/public-api";
 import {
     ExplainYourselfSettings,
     FieldParams,
@@ -7,6 +12,7 @@ import {
     TextFieldParams,
 } from "./_types.js";
 import { DEFAULT_RETRIES } from "./consts.js";
+import { PrefixLogger } from "./logger.js";
 
 export function numberField(params: FieldParams & NumberFieldParams): {
     label: string;
@@ -236,4 +242,54 @@ export async function withRetries<T>(
         }
         console.debug(`Retrying attempt ${attempt + 1}...`);
     }
+}
+
+export function checkRegex(
+    exclusionRegex: string,
+    exclusionTypes: string[],
+    post: Post,
+    log: PrefixLogger,
+): boolean {
+    if (exclusionRegex) {
+        const regex = new RegExp(exclusionRegex, "i");
+        const toCheck = [];
+        if (exclusionTypes) {
+            if (exclusionTypes.includes("title")) {
+                toCheck.push(post.title);
+            }
+            if (exclusionTypes.includes("body")) {
+                toCheck.push(post.body || "");
+            }
+        }
+        if (toCheck.some((text) => regex.test(text))) {
+            log.info("Post excluded by regex");
+            return true;
+        }
+    }
+    return false;
+}
+
+export function checkFlair(
+    postFlairIds: string,
+    postFlairListType: string[],
+    post: Post,
+    log: PrefixLogger,
+): boolean {
+    if (postFlairIds) {
+        const flairIds = postFlairIds.split("\n");
+        const postFlairExclusion: boolean = postFlairListType?.[0] === "exclusion";
+        const postFlairId = post.flair?.templateId || "";
+        if (postFlairExclusion) {
+            if (flairIds.includes(postFlairId)) {
+                log.info("Post excluded by flair");
+                return true;
+            }
+        } else {
+            if (!flairIds.includes(postFlairId)) {
+                log.info("Post does not have the required flair");
+                return true;
+            }
+        }
+    }
+    return false;
 }
