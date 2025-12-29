@@ -7,7 +7,7 @@ import { PostData } from "./postData.js";
 import { humanDuration, resolveSettings, withRetries } from "./utils.js";
 
 const logger = new PrefixLogger(
-    "Message Handler | u/%s | conversationId: %s | messageId: %s",
+    "Message Handler | postId: %s | conversationId: %s | messageId: %s",
 );
 
 export async function handleMessage(
@@ -27,11 +27,11 @@ export async function handleMessage(
     if (event.messageAuthor.name == (await reddit.getAppUser()).username) {
         return;
     }
-    const log = logger.injectArgs(event.messageAuthor.name, conversationId, messageId);
     const postData = await PostData.getPostDataByConversationId(
         context,
         conversationId,
     );
+    const log = logger.injectArgs(postData?.postId, conversationId, messageId);
     if (!postData) {
         log.error("No post data found for message");
         return;

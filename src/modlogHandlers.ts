@@ -121,6 +121,7 @@ async function handleApprove(
         allowExplanation,
         explanationPendingComment,
         ignoreModerators,
+        ignoreFilteredPosts,
     } = await resolveSettings(
         context.settings,
         "exclusionRegex",
@@ -130,6 +131,7 @@ async function handleApprove(
         "allowExplanation",
         "explanationPendingComment",
         "ignoreModerators",
+        "ignoreFilteredPosts",
     );
     let post;
     if (event.targetPost.id) {
@@ -151,14 +153,12 @@ async function handleApprove(
         log.info("Post already marked as safe");
         return;
     }
+    if (await postData.inCategory(PostCategory.Seen)) {
+        log.info("Post already processed");
+        return;
+    }
     if (filteredPosts.members.length > 0) {
         await context.redis.zRem("posts:filtered", [post.id]);
-        if (await postData.inCategory(PostCategory.Seen)) {
-            log.info(
-                "Post was in filtered set, but already processed. Skipping reprocessing.",
-            );
-            return;
-        }
         log.info("Post was in filtered set, reprocessing");
 
         if (checkRegex(exclusionRegex, exclusionTypes, post, log)) return;
@@ -182,7 +182,8 @@ async function handleApprove(
     if (await postData.isPendingResponse()) {
         postData.createdAt = new Date().valueOf();
         await postData.writeToRedis();
-        if (postData.sentModmailId === "") {
+        if (!postData.sentModmailId && ignoreFilteredPosts) {
+            // if we haven't sent modmail yet, re-initialize the post session
             const post = await context.reddit.getPostById(postData.postId);
             await postData.initializePostSession(
                 explanationPendingComment,
@@ -191,6 +192,8 @@ async function handleApprove(
                 ignoreModerators,
             );
         } else if (postData.responseMessageId) {
+            // if we have a response message, mark safe
+            // This covers the case where a mod approves after the user already responded
             await postData.markApproved();
             log.info("Marked Safe");
         } else {

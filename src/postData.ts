@@ -189,6 +189,7 @@ export class PostData {
         });
         postData.postId = postId;
         postData.log._debugMode = (await context.settings.get("debugMode")) === "true";
+        postData.log.debug(`Loaded data for postId ${postId}:`, data);
     }
 
     age(now: number | undefined = undefined): number {
@@ -201,7 +202,6 @@ export class PostData {
     ): Promise<Comment | undefined> {
         let text = "";
         let comment: Comment | undefined = undefined;
-        this.log.info(`Replying with Comment${commentType}`);
         if (this.commentId) {
             comment = await this.context.reddit.getCommentById(this.commentId);
         }
@@ -209,6 +209,7 @@ export class PostData {
             this.post = await this.resolvePost();
         }
         await this.#injectLogArgs();
+        this.log.info(`Replying with Comment${commentType}`);
         let commentModified = false;
         switch (commentType) {
             case CommentType.Accepted:
@@ -326,9 +327,10 @@ export class PostData {
                 this.log.info(
                     "Comment already exists, skipping adding pending comment",
                 );
+                return;
             } else {
                 const comment = await this.commentReply(CommentType.Pending);
-                if (comment === undefined) {
+                if (!comment) {
                     this.log.error("Failed to comment");
                     return;
                 }
@@ -364,9 +366,12 @@ export class PostData {
     }
 
     async isPendingResponse(): Promise<boolean> {
-        return (
-            !(await this.inCategory(PostCategory.Safe)) && this.responseMessageId === ""
+        const isSafe = await this.inCategory(PostCategory.Safe);
+        const isActive = await this.inCategory(PostCategory.Active);
+        this.log.debug(
+            `isPendingResponse: isSafe=${isSafe}, isActive=${isActive}, responseMessageId=${this.responseMessageId}`,
         );
+        return !(isSafe || isActive || this.responseMessageId);
     }
 
     async leavePrivateModNote(noteType: PrivateNote): Promise<void> {

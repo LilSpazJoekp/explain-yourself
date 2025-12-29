@@ -309,6 +309,11 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.4.1
+
+- Fix an regression where multiple comments and/or modmail conversations could be created for the same post if the post
+  was approved after being filtered by AutoModerator.
+
 ## 1.4.0
 
 - Add the ability to still process posts filtered by AutoModerator.

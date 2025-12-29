@@ -169,8 +169,8 @@ export async function checkComments(
                 toRemove.map(async (postData) => {
                     log.info("[%s] Removing post", postData.postId);
                     await postData.post.remove();
-                    await postData.markRemoved();
                     await postData.commentReply(CommentType.Removed);
+                    await postData.markRemoved();
                 }),
             )
             .concat(
@@ -292,6 +292,8 @@ export async function checkResponses(
             .map(async (postData) => {
                 log.info("[%s] Removing post due to no response", postData.postId);
                 await reddit.remove(postData.postId, false);
+                // if lateReplyDuration is less than 1, we mark as removed
+                // otherwise no response so we can check for late replies
                 if (lateReplyDuration < 1) {
                     log.info(
                         "[%s] Author did not reply in allotted time, removing post",
