@@ -56,13 +56,11 @@ export async function handlePost(
             return;
         }
     }
-
-    const postData = await PostData.fromPost(context, post);
-
-    if (await postData.inCategory(PostCategory.Seen)) {
+    if (await PostData.exists(context, post.id)) {
         log.info("Post already processed");
         return;
     }
+    const postData = await PostData.fromPost(context, post);
     if ((await postData.inCategory(PostCategory.Filtered)) && ignoreFilteredPosts) {
         log.info("Post is filtered and ignoring filtered posts is enabled, ignoring");
         return;

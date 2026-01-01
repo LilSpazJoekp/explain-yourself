@@ -162,6 +162,15 @@ export class PostData {
         return await PostData.fromPostId(context, postId);
     }
 
+    static async exists(
+        context: Context | TriggerContext,
+        postId: string,
+    ): Promise<boolean> {
+        const { redis } = context;
+        const data: Record<string, string> = await redis.hGetAll(postId);
+        return Object.keys(data).length > 0;
+    }
+
     private static async loadFromRedis(
         postData: PostData,
         redis: RedisClient,
