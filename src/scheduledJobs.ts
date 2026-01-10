@@ -181,7 +181,7 @@ export async function checkComments(
                         postData.comment.id,
                     );
                     await postData.report();
-                    await postData.setCategory(PostCategory.Removed);
+                    await postData.markRemoved();
                 }),
             ),
     );
@@ -300,8 +300,7 @@ export async function checkResponses(
                         postData.postId,
                     );
                     await postData.commentReply(CommentType.Removed);
-                    await postData.setCategory(PostCategory.Removed);
-                    await postData.leavePrivateModNote(PrivateNote.Removed);
+                    await postData.markRemoved();
                 } else {
                     await postData.setCategory(PostCategory.NoResponse);
                     await postData.leavePrivateModNote(PrivateNote.NoResponse);
@@ -314,8 +313,6 @@ export async function checkResponses(
     const noResponse = await PostData.fetchFromCategory(
         PostCategory.NoResponse,
         context,
-        false,
-        false,
     );
     await Promise.all(
         noResponse
@@ -327,8 +324,7 @@ export async function checkResponses(
                 );
                 await reddit.remove(postData.postId, false);
                 await postData.commentReply(CommentType.Removed);
-                await postData.setCategory(PostCategory.Removed);
-                await postData.leavePrivateModNote(PrivateNote.Removed);
+                await postData.markRemoved();
             }),
     );
 }

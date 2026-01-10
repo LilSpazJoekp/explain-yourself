@@ -1,14 +1,18 @@
 import {
+    Context,
     Post,
+    RedditAPIClient,
     SettingsClient,
     SettingsFormFieldValidatorEvent,
-
+    TriggerContext,
+    WikiPage,
 } from "@devvit/public-api";
 import {
     ExplainYourselfSettings,
     FieldParams,
     NumberFieldParams,
     Placeholder,
+    PostCategory,
     TextFieldParams,
 } from "./_types.js";
 import { DEFAULT_RETRIES } from "./consts.js";
@@ -292,4 +296,70 @@ export function checkFlair(
         }
     }
     return false;
+}
+
+export async function dumpRedisData(
+    context: TriggerContext | Context,
+    ...postIds: string[]
+): Promise<void> {
+    const dump: {
+        [key in PostCategory]: string[];
+    } & {
+        postData: { [postId: string]: Record<string, string> };
+    } = {
+        active: [],
+        deleted: [],
+        filtered: [],
+        noResponse: [],
+        pendingResponse: [],
+        removed: [],
+        safe: [],
+        seen: [],
+        postData: {},
+    };
+    const { redis, reddit, subredditName } = context;
+    console.log(`Received request to dump Redis data for posts: ${postIds || "all"}`);
+    const selectedPostIds = postIds.map((postId) =>
+        postId.startsWith("t3_") ? postId : `t3_${postId}`,
+    );
+    await Promise.all(
+        Object.values(PostCategory).map(async (category) => {
+            dump[category] = await Promise.all(
+                (await redis.zRange(`posts:${category}`, 0, -1, { by: "rank" }))
+                    .filter(({ member }) =>
+                        postIds.length > 0 ? selectedPostIds.includes(member) : true,
+                    )
+                    .map(async ({ member }) => {
+                        const postData = await redis.hGetAll(member);
+                        if (Object.keys(postData).length > 0) {
+                            dump.postData[member] = postData;
+                        }
+                        return member;
+                    }),
+            );
+        }),
+    );
+    const content = `    ${JSON.stringify(dump, null, 2).replace(/(\n)/gi, "\n    ")}`;
+    const wikiPage: WikiPage = await ensureWikiPage(
+        reddit,
+        subredditName!,
+        "app_config/post-explainer/redis_data",
+    );
+    await wikiPage.update(content, "Redis data dump for debugging");
+}
+
+async function ensureWikiPage(
+    reddit: RedditAPIClient,
+    subreddit: string,
+    wikiPage: string,
+): Promise<WikiPage> {
+    try {
+        return await reddit.getWikiPage(subreddit, wikiPage);
+    } catch {
+        return await reddit.createWikiPage({
+            subredditName: subreddit,
+            page: wikiPage,
+            content: "```json\n{}\n```",
+        });
+    }
 }

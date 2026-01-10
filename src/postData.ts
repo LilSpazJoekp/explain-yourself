@@ -3,10 +3,20 @@ import {
     Context,
     JobContext,
     Post,
-    RedisClient,
     TriggerContext,
+    User,
 } from "@devvit/public-api";
-import { CommentType, PlaceholderField, PostCategory, ResponseType } from "./_types.js";
+
+import {
+    AnyContext,
+    CATEGORY_REMOVAL_MAPPING,
+    CommentType,
+    PlaceholderField,
+    PostCategory,
+    ResponseType,
+    TERMINAL_CATEGORIES,
+    TerminalCategory,
+} from "./_types.js";
 import {
     MAX_MESSAGE_SUBJECT_LENGTH,
     MAX_REPORT_REASON_LENGTH,
@@ -59,35 +69,92 @@ type RespondType =
     | TooShortRespondParams;
 
 export class PostData {
-    author: string;
-    comment: Comment | null;
     commentId: string;
-    context: Context | JobContext | TriggerContext;
     createdAt: number;
     deleted: boolean;
     filtered: boolean;
     log: PrefixLogger = new PrefixLogger("PostData | postId: %s");
-    post: Post | null;
-    postId: string;
-    removed: boolean;
     responseMessageId: string;
     safe: boolean;
     sentModmailId: string;
 
-    constructor(context: Context | JobContext | TriggerContext) {
-        this.author = "";
-        this.comment = null;
+    constructor(
+        public context: AnyContext,
+        public postId: string,
+    ) {
         this.commentId = "";
-        this.context = context;
         this.createdAt = 0;
         this.deleted = false;
         this.filtered = false;
-        this.post = null;
-        this.postId = "";
-        this.removed = false;
         this.responseMessageId = "";
         this.safe = false;
         this.sentModmailId = "";
+    }
+
+    _author: User | undefined;
+
+    get author(): User {
+        if (this._author) return this._author;
+        let _author;
+        this.post.getAuthor().then((author) => {
+            _author = author;
+        });
+        return _author!;
+    }
+
+    set author(value: User | undefined) {
+        this._author = value;
+    }
+
+    _comment: Comment | undefined;
+
+    get comment(): Comment | null {
+        if (this._comment) return this._comment;
+        let _comment = null;
+        if (this.commentId)
+            this.context.reddit.getCommentById(this.commentId!).then((comment) => {
+                _comment = comment;
+            });
+        return _comment;
+    }
+
+    set comment(value: Comment) {
+        this._comment = value;
+    }
+
+    _post: Post | undefined;
+
+    get post(): Post {
+        if (this._post) return this._post;
+        let _post = null;
+        this.context.reddit.getPostById(this.postId).then((post) => {
+            _post = post;
+        });
+        return _post!;
+    }
+
+    set post(value: Post) {
+        this._post = value;
+    }
+
+    _removed: boolean = false;
+
+    get removed(): boolean {
+        if (this._removed !== undefined) return this._removed;
+        return this.post.removed;
+    }
+
+    set removed(value: boolean) {
+        this._removed = value;
+    }
+
+    static async exists(
+        context: Context | TriggerContext,
+        postId: string,
+    ): Promise<boolean> {
+        const { redis } = context;
+        const data: Record<string, string> = await redis.hGetAll(postId);
+        return Object.keys(data).length > 0;
     }
 
     static async fetchFromCategory(
@@ -96,9 +163,9 @@ export class PostData {
         fetchComments: boolean = false,
         fetchPosts: boolean = false,
     ): Promise<PostData[]> {
-        const { redis } = context;
+        const { redis, settings, reddit } = context;
         const results = await redis.zScan(`posts:${category}`, 0);
-        if ((await context.settings.get("debugMode")) === "true") {
+        if ((await settings.get("debugMode")) === "true") {
             console.log(category, results);
         }
         const postDataItems = await Promise.all(
@@ -108,10 +175,12 @@ export class PostData {
                     if (!postData) return undefined;
 
                     if (fetchPosts) {
-                        await postData.resolvePost();
+                        postData.post = await reddit.getPostById(postData.postId);
                     }
                     if (fetchComments) {
-                        await postData.resolveComment();
+                        postData.comment = await reddit.getCommentById(
+                            postData.commentId,
+                        );
                     }
                     return postData;
                 } catch (error) {
@@ -130,8 +199,25 @@ export class PostData {
         context: Context | TriggerContext,
         post: Post,
     ): Promise<PostData> {
-        const postData = new PostData(context);
-        postData.author = (await post.getAuthor())?.username || "";
+        const postData = new PostData(context, post.id);
+        await postData.loadFromRedis();
+
+        let additionalArgs: string[] = [];
+        if ((await context.settings.get("debugMode")) === "true") {
+            postData.log._debugMode = true;
+            postData.log.prefix = `${postData.log.prefix} | u/%s | commentId: %s | conversationId: %s | deleted: %s | filtered: %s | removed: %s | safe: %s`;
+            additionalArgs = [
+                postData.author?.username || "[deleted]",
+                postData.commentId,
+                postData.sentModmailId,
+                postData.deleted.toString(),
+                postData.filtered.toString(),
+                postData.removed.toString(),
+                postData.safe.toString(),
+            ];
+        }
+        postData.log.injectArgs(postData.postId, ...additionalArgs);
+        postData.author = await post.getAuthor();
         postData.createdAt = post.createdAt.valueOf();
         postData.postId = post.id;
         postData.removed = post.removed;
@@ -144,10 +230,15 @@ export class PostData {
         context: Context | TriggerContext,
         postId: string,
     ): Promise<PostData | undefined> {
-        const { redis } = context;
-        const postData = new PostData(context);
-        await this.loadFromRedis(postData, redis, postId, context);
-        return postData;
+        try {
+            return await PostData.fromPost(
+                context,
+                await context.reddit.getPostById(postId),
+            );
+        } catch (error) {
+            console.error(`Failed to fetch post by ID ${postId}:`, error);
+            return undefined;
+        }
     }
 
     static async getPostDataByConversationId(
@@ -160,45 +251,6 @@ export class PostData {
             return undefined;
         }
         return await PostData.fromPostId(context, postId);
-    }
-
-    static async exists(
-        context: Context | TriggerContext,
-        postId: string,
-    ): Promise<boolean> {
-        const { redis } = context;
-        const data: Record<string, string> = await redis.hGetAll(postId);
-        return Object.keys(data).length > 0;
-    }
-
-    private static async loadFromRedis(
-        postData: PostData,
-        redis: RedisClient,
-        postId: string,
-        context: Context | TriggerContext,
-    ): Promise<void> {
-        const data: Record<keyof PostData, string> = await redis.hGetAll(postId);
-        if (Object.keys(data).length === 0) {
-            return;
-        }
-        const keys = Object.keys(data) as (keyof PostData)[];
-        keys.forEach((key: keyof PostData) => {
-            if (
-                key == "deleted" ||
-                key === "filtered" ||
-                key === "removed" ||
-                key === "safe"
-            ) {
-                postData[key] = data[key] === "true";
-            } else if (key === "createdAt") {
-                postData[key] = parseInt(data[key]);
-            } else {
-                postData[key] = data[key] as never;
-            }
-        });
-        postData.postId = postId;
-        postData.log._debugMode = (await context.settings.get("debugMode")) === "true";
-        postData.log.debug(`Loaded data for postId ${postId}:`, data);
     }
 
     age(now: number | undefined = undefined): number {
@@ -214,10 +266,6 @@ export class PostData {
         if (this.commentId) {
             comment = await this.context.reddit.getCommentById(this.commentId);
         }
-        if (this.post === null) {
-            this.post = await this.resolvePost();
-        }
-        await this.#injectLogArgs();
         this.log.info(`Replying with Comment${commentType}`);
         let commentModified = false;
         switch (commentType) {
@@ -325,12 +373,7 @@ export class PostData {
         post: Post,
         ignoreModerators: boolean,
     ) {
-        await PostData.loadFromRedis(
-            this,
-            this.context.redis,
-            this.postId,
-            this.context,
-        );
+        await this.loadFromRedis();
         if (explanationPendingComment) {
             if (this.commentId) {
                 this.log.info(
@@ -352,8 +395,11 @@ export class PostData {
                 await this.sendMessage(post);
                 const subreddit = await this.context.reddit.getCurrentSubreddit();
                 if (
-                    (await subreddit.getModerators({ username: this.author }).all())
-                        .length > 0
+                    (
+                        await subreddit
+                            .getModerators({ username: this.author?.username || "" })
+                            .all()
+                    ).length > 0
                 ) {
                     if (!ignoreModerators) {
                         this.log.info(
@@ -377,10 +423,11 @@ export class PostData {
     async isPendingResponse(): Promise<boolean> {
         const isSafe = await this.inCategory(PostCategory.Safe);
         const isActive = await this.inCategory(PostCategory.Active);
-        this.log.debug(
-            `isPendingResponse: isSafe=${isSafe}, isActive=${isActive}, responseMessageId=${this.responseMessageId}`,
+        const isPendingResponse = await this.inCategory(PostCategory.PendingResponse);
+        this.log.info(
+            `isPendingResponse: inPendingResponse: ${isPendingResponse} isSafe=${isSafe}, isActive=${isActive}, responseMessageId=${this.responseMessageId}`,
         );
-        return !(isSafe || isActive || this.responseMessageId);
+        return isPendingResponse || !(isSafe || isActive || this.responseMessageId);
     }
 
     async leavePrivateModNote(noteType: PrivateNote): Promise<void> {
@@ -408,6 +455,24 @@ export class PostData {
         );
     }
 
+    async loadFromRedis(): Promise<void> {
+        const { redis, settings } = this.context;
+        const data: Record<keyof PostData, string> = await redis.hGetAll(this.postId);
+        if (Object.keys(data).length === 0) {
+            return;
+        }
+        (Object.keys(data) as (keyof PostData)[]).forEach((key: keyof PostData) => {
+            if (key == "deleted" || key === "filtered" || key === "safe") {
+                this[key] = data[key] === "true";
+            } else if (key === "createdAt") {
+                this[key] = parseInt(data[key]);
+            } else {
+                this[key] = data[key] as never;
+            }
+        });
+        this.log._debugMode = (await settings.get("debugMode")) === "true";
+    }
+
     async markApproved(): Promise<void> {
         this.safe = true;
         await this.setCategory(PostCategory.Safe);
@@ -423,11 +488,13 @@ export class PostData {
         await this.leavePrivateModNote(PrivateNote.Deleted);
     }
 
-    async markRemoved(): Promise<void> {
+    async markRemoved(modRemoved: boolean = false): Promise<void> {
         this.removed = true;
         await this.setCategory(PostCategory.Removed);
         await this.writeToRedis();
-        await this.leavePrivateModNote(PrivateNote.Removed);
+        await this.leavePrivateModNote(
+            modRemoved ? PrivateNote.ModRemoved : PrivateNote.BotRemoved,
+        );
     }
 
     async markSafe(): Promise<void> {
@@ -468,7 +535,6 @@ export class PostData {
             "removalScoreRatioBase",
             "removalScoreRatioOffset",
         );
-        await this.#injectLogArgs();
         let score = staticRemovalScore;
         if (useScoreRatio) {
             score = Math.floor(
@@ -492,10 +558,10 @@ export class PostData {
     }
 
     async report() {
-        if (this.comment === null) {
-            this.comment = await this.resolveComment();
+        if (!this.comment) {
+            this.log.error("No comment to report");
+            return;
         }
-        await this.#injectLogArgs();
         await this.context.reddit.report(this.comment, {
             reason: (
                 await this.#replacePlaceholders(PlaceholderField.reportReason)
@@ -504,24 +570,7 @@ export class PostData {
         this.log.info("Comment reported");
     }
 
-    async resolveComment(): Promise<Comment> {
-        if (!this.comment)
-            this.comment = await this.context.reddit.getCommentById(this.commentId);
-        return this.comment;
-    }
-
-    async resolvePost(): Promise<Post> {
-        if (!this.post) this.post = await this.context.reddit.getPostById(this.postId);
-        return this.post;
-    }
-
     async respond(params: RespondType): Promise<void> {
-        if (this.post === null) {
-            this.post = await this.resolvePost();
-        }
-        if (this.comment === null && this.commentId) {
-            this.comment = await this.resolveComment();
-        }
         let body: string;
         switch (params.responseType) {
             case ResponseType.Accepted:
@@ -576,10 +625,7 @@ export class PostData {
     }
 
     async savePost(category: PostCategory): Promise<void> {
-        await this.context.redis.zAdd(`posts:${category}`, {
-            member: this.postId,
-            score: this.createdAt,
-        });
+        await this.setCategory(category);
         await this.writeToRedis();
     }
 
@@ -636,25 +682,32 @@ export class PostData {
         }
     }
 
-    async setCategory(newCategory: PostCategory): Promise<void> {
-        await this.#injectLogArgs();
-        this.log.info(`Moving post ${this.postId} to ${newCategory}`);
-        if (newCategory !== PostCategory.Seen) {
+    async setCategory(toAdd: PostCategory): Promise<void> {
+        const inTerminalState: boolean = (
             await Promise.all(
-                Object.values(PostCategory)
-                    .filter((category) => category !== PostCategory.Seen)
-                    .map(
-                        async (category) =>
-                            await this.context.redis.zRem(`posts:${category}`, [
-                                this.postId,
-                            ]),
-                    ),
-            );
+                Object.values(TERMINAL_CATEGORIES).map(
+                    async (category: TerminalCategory) => {
+                        const inCategory = await this.inCategory(category);
+                        if (inCategory)
+                            this.log.info(`Post is in terminal category: ${category}`);
+                        return inCategory;
+                    },
+                ),
+            )
+        ).some(Boolean);
+        if (inTerminalState) {
+            this.log.info(`Post is in a terminal category, not modifying categories`);
+            return;
         }
-        await this.context.redis.zAdd(`posts:${newCategory}`, {
+        this.log.info(`Adding post ${this.postId} to ${toAdd}`);
+        await this.context.redis.zAdd(`posts:${toAdd}`, {
             member: this.postId,
             score: this.createdAt,
         });
+        for (const category of CATEGORY_REMOVAL_MAPPING[toAdd] || []) {
+            this.log.info(`Removing post ${this.postId} from ${category}`);
+            await this.context.redis.zRem(`posts:${category}`, [this.postId]);
+        }
     }
 
     async writeToRedis(): Promise<void> {
@@ -669,7 +722,7 @@ export class PostData {
             ) {
                 continue;
             }
-            if (key !== "postId")
+            if (key !== "postId" && !key.startsWith("_"))
                 data[key as keyof PostData] = this[key as keyof PostData]?.toString();
         }
         await this.context.redis.hSet(this.postId, data);
@@ -698,7 +751,6 @@ export class PostData {
         idType: "conversation" | "comment",
         otherId: string,
     ): Promise<void> {
-        await this.#injectLogArgs();
         this.log.info(`Associating ${this.postId} with ${otherId}`);
         await this.context.redis.hSet(`${idType}:${otherId}`, {
             postId: this.postId,
@@ -708,9 +760,6 @@ export class PostData {
     async #generateExplanationAcceptedCommentBody(
         explanation: string,
     ): Promise<string> {
-        if (this.post === null) {
-            this.post = await this.resolvePost();
-        }
         const text = await this.#replacePlaceholders(
             PlaceholderField.explanationAcceptedComment,
         );
@@ -724,23 +773,6 @@ export class PostData {
                 ? this.#spoiler(explanation)
                 : "> " + explanation.replace(/\n/g, "\n> "),
         );
-    }
-
-    async #injectLogArgs(): Promise<void> {
-        let additionalArgs: string[] = [];
-        if ((await this.context.settings.get("debugMode")) === "true") {
-            this.log.prefix = `${this.log.prefix} | u/%s | commentId: %s | conversationId: %s | deleted: %s | filtered: %s | removed: %s | safe: %s`;
-            additionalArgs = [
-                this.author,
-                this.commentId,
-                this.sentModmailId,
-                this.deleted.toString(),
-                this.filtered.toString(),
-                this.removed.toString(),
-                this.safe.toString(),
-            ];
-        }
-        this.log.injectArgs(this.postId, ...additionalArgs);
     }
 
     #modifyComment(
@@ -763,9 +795,6 @@ export class PostData {
     }
 
     async #replacePlaceholders(field: PlaceholderField): Promise<string> {
-        if (this.post === null) {
-            this.post = await this.resolvePost();
-        }
         const { replyDuration, lateReplyDuration } = await resolveSettings(
             this.context.settings,
             "replyDuration",

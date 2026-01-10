@@ -4,7 +4,7 @@ import { CommentType, PostCategory, ResponseType } from "./_types.js";
 import { REDDIT_MENTION_REGEX, URL_REGEX } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
-import { humanDuration, resolveSettings, withRetries } from "./utils.js";
+import { humanDuration, resolveSettings, } from "./utils.js";
 
 const logger = new PrefixLogger(
     "Message Handler | postId: %s | conversationId: %s | messageId: %s",
@@ -36,10 +36,10 @@ export async function handleMessage(
         log.error("No post data found for message");
         return;
     }
-    if (event.messageAuthor.name !== postData.author) {
+    if (event.messageAuthor.name !== postData.author.username) {
         log.info(
             "Post data author (%s) does not match message author (%s), ignoring",
-            postData.author,
+            postData.author.username,
             event.messageAuthor.name,
         );
         return;
@@ -159,5 +159,4 @@ export async function handleMessage(
             responseType: ResponseType.TooShort,
         });
     }
-    await withRetries(() => reddit.modMail.archiveConversation(conversationId));
 }

@@ -309,6 +309,11 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.4.3
+
+- Improve handling of posts' status when actioned by AutoModerator or safety checks. This aims to hopefully resolve the
+  issue with multiple comments/modmails being created.
+
 ## 1.4.2
 
 - Attempt to fix the previous release's issue with multiple comments/modmails being created again.

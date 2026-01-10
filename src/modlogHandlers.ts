@@ -180,6 +180,7 @@ async function handleApprove(
         }
     }
     if (await postData.isPendingResponse()) {
+        log.info("Resetting post createdAt");
         postData.createdAt = new Date().valueOf();
         await postData.writeToRedis();
         if (!postData.sentModmailId && ignoreFilteredPosts) {
@@ -231,7 +232,7 @@ async function handleRemove(
         await postData.markSafe();
         return;
     }
-    await postData.markRemoved();
+    await postData.markRemoved(true);
     log.info("Marked Removed");
 }
 
@@ -243,10 +244,13 @@ export async function handleFilter(
         logger.error("No post found for Automoderator filter event");
         return;
     }
+    // Not using PostData here because we just need to quickly mark it filtered
     await context.redis.zAdd(`posts:filtered`, {
         member: event.post.id,
         score: event.post.createdAt,
     });
-    const log = logger.injectArgs("Automod Filtered", "AutoModerator", event.post.id);
-    log.info("Marked Filtered");
+
+    logger
+        .injectArgs("Automod Filtered", "AutoModerator", event.post.id)
+        .info("Marked Filtered");
 }

@@ -1,4 +1,4 @@
-import { Comment, Post } from "@devvit/public-api";
+import { Comment, Context, JobContext, Post, TriggerContext } from "@devvit/public-api";
 import { PostData } from "./postData.js";
 
 export interface ExplainYourselfSettings {
@@ -19,8 +19,8 @@ export interface ExplainYourselfSettings {
     explanationPendingComment: string;
     explanationTooLateMessageBody: string;
     explanationTooShortMessageBody: string;
-    ignoreModerators: boolean;
     ignoreFilteredPosts: boolean;
+    ignoreModerators: boolean;
     lateReplyDuration: number;
     lockComment: boolean;
     markSafeWithCommentScore: boolean;
@@ -103,15 +103,73 @@ export enum CommentType {
 }
 
 export enum PostCategory {
+    /**
+     * Post is in the active state and the comment is being checked.
+     */
     Active = "active",
+    /**
+     * The author has deleted the post.
+     */
     Deleted = "deleted",
+    /**
+     * Post was filtered by automoderator.
+     */
     Filtered = "filtered",
+    /**
+     * Post did not receive a response in time but can still be responded to
+     * within the late reply duration.
+     */
     NoResponse = "noResponse",
+    /**
+     * Post is awaiting an initial response from the author.
+     */
     PendingResponse = "pendingResponse",
+    /**
+     * Post was removed by a moderator or the bot.
+     */
     Removed = "removed",
+    /**
+     * Post was marked safe and its comment will not be checked anymore.
+     */
     Safe = "safe",
+    /**
+     * Post has been seen. Seen posts are not initially processed again.
+     */
     Seen = "seen",
 }
+
+export const MUTABLE_CATEGORIES = {
+    active: PostCategory.Active,
+    filtered: PostCategory.Filtered,
+    noResponse: PostCategory.NoResponse,
+    pendingResponse: PostCategory.PendingResponse,
+} as const;
+
+export type MutableCategory =
+    (typeof MUTABLE_CATEGORIES)[keyof typeof MUTABLE_CATEGORIES];
+
+export const TERMINAL_CATEGORIES = {
+    deleted: PostCategory.Deleted,
+    safe: PostCategory.Safe,
+} as const;
+
+export type TerminalCategory =
+    (typeof TERMINAL_CATEGORIES)[keyof typeof TERMINAL_CATEGORIES];
+
+export const CATEGORY_REMOVAL_MAPPING: { [key in PostCategory]?: MutableCategory[] } = {
+    [PostCategory.Safe]: [...Object.values(MUTABLE_CATEGORIES)],
+    [PostCategory.Active]: [
+        PostCategory.Filtered,
+        PostCategory.NoResponse,
+        PostCategory.PendingResponse,
+    ],
+    [PostCategory.Removed]: [PostCategory.Filtered],
+    [PostCategory.Deleted]: [...Object.values(MUTABLE_CATEGORIES)],
+    [PostCategory.Filtered]: [],
+    [PostCategory.NoResponse]: [PostCategory.PendingResponse],
+    [PostCategory.PendingResponse]: [PostCategory.Filtered],
+    [PostCategory.Seen]: [],
+} as const;
 
 export enum ResponseType {
     Accepted = "accepted",
@@ -124,3 +182,5 @@ export enum ResponseType {
 }
 
 export type PostDataList = (PostData & { comment: Comment; post: Post })[];
+
+export type AnyContext = Context | JobContext | TriggerContext;

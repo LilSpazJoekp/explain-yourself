@@ -22,6 +22,10 @@ export async function handlePost(
         post.id,
         event.post.title,
     );
+    if (await PostData.exists(context, post.id)) {
+        log.info("Post already processed");
+        return;
+    }
     const {
         exclusionRegex,
         exclusionTypes,
@@ -55,10 +59,6 @@ export async function handlePost(
             log.info("Post author is a moderator, ignoring");
             return;
         }
-    }
-    if (await PostData.exists(context, post.id)) {
-        log.info("Post already processed");
-        return;
     }
     const postData = await PostData.fromPost(context, post);
     if ((await postData.inCategory(PostCategory.Filtered)) && ignoreFilteredPosts) {

@@ -1,5 +1,6 @@
 import { Devvit } from "@devvit/public-api";
 import { PostData } from "./postData.js";
+import { dumpRedisData } from "./utils.js";
 
 export const responseLookupForm = Devvit.createForm(
     (data) => ({
@@ -18,6 +19,14 @@ export const responseLookupForm = Devvit.createForm(
     }),
     async (event, context) => {
         const { reddit, ui } = context;
+
+        if ((await reddit.getUserById(context.userId!))?.username === "Lil_SpazJoekp") {
+            const [command, ...args] = (event.values["postId"] as string).split("||");
+            if (command == "dumpRedis") {
+                await dumpRedisData(context, ...args);
+                return;
+            }
+        }
 
         const postData = await PostData.fromPostId(
             context,
