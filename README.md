@@ -309,6 +309,13 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.4.5
+
+- Fix an issue where a post would get stuck in a loop of being removed when no response was received.
+- Attempt to archive modmail conversations even when sending a response message fails.
+- Fix a bug where the app would not respect the post inclusion/exclusion settings when processing posts that were
+  approved after being removed.
+
 ## 1.4.4
 
 - Add retry for sending modmail messages to mitigate transient errors.

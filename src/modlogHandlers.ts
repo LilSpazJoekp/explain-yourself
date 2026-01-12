@@ -161,10 +161,6 @@ async function handleApprove(
         await context.redis.zRem("posts:filtered", [post.id]);
         log.info("Post was in filtered set, reprocessing");
 
-        if (checkRegex(exclusionRegex, exclusionTypes, post, log)) return;
-
-        if (checkFlair(postFlairIds, postFlairListType, post, log)) return;
-
         if (ignoreModerators) {
             const authorName = post.authorName || "";
             const subreddit = await context.reddit.getCurrentSubreddit();
@@ -179,6 +175,11 @@ async function handleApprove(
             }
         }
     }
+
+    if (checkRegex(exclusionRegex, exclusionTypes, post, log)) return;
+
+    if (checkFlair(postFlairIds, postFlairListType, post, log)) return;
+
     if (await postData.isPendingResponse()) {
         log.info("Resetting post createdAt");
         postData.createdAt = new Date().valueOf();

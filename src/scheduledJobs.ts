@@ -9,7 +9,7 @@ import { CommentType, PostCategory, PostDataList } from "./_types.js";
 import { CHECK_CRON, JOBS, PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
 import { PostData } from "./postData.js";
-import { resolveSettings } from "./utils.js";
+import { resolveSettings, safeRemove } from "./utils.js";
 
 export async function checkComments(
     _event: ScheduledJobEvent<JSONObject>,
@@ -291,7 +291,7 @@ export async function checkResponses(
             .filter((postData: PostData) => !postData.responseMessageId)
             .map(async (postData) => {
                 log.info("[%s] Removing post due to no response", postData.postId);
-                await reddit.remove(postData.postId, false);
+                if (!(await safeRemove(reddit, postData, log))) return;
                 // if lateReplyDuration is less than 1, we mark as removed
                 // otherwise no response so we can check for late replies
                 if (lateReplyDuration < 1) {
@@ -302,6 +302,10 @@ export async function checkResponses(
                     await postData.commentReply(CommentType.Removed);
                     await postData.markRemoved();
                 } else {
+                    log.info(
+                        "[%s] Author did not reply in allotted time, marking as no response and awaiting late reply",
+                        postData.postId,
+                    );
                     await postData.setCategory(PostCategory.NoResponse);
                     await postData.leavePrivateModNote(PrivateNote.NoResponse);
                 }
@@ -322,7 +326,7 @@ export async function checkResponses(
                     "[%s] Author did not late reply in allotted time, removing submission",
                     postData.postId,
                 );
-                await reddit.remove(postData.postId, false);
+                if (!(await safeRemove(reddit, postData, log))) return;
                 await postData.commentReply(CommentType.Removed);
                 await postData.markRemoved();
             }),

@@ -163,7 +163,7 @@ export const CATEGORY_REMOVAL_MAPPING: { [key in PostCategory]?: MutableCategory
         PostCategory.NoResponse,
         PostCategory.PendingResponse,
     ],
-    [PostCategory.Removed]: [PostCategory.Filtered],
+    [PostCategory.Removed]: [...Object.values(MUTABLE_CATEGORIES)],
     [PostCategory.Deleted]: [...Object.values(MUTABLE_CATEGORIES)],
     [PostCategory.Filtered]: [],
     [PostCategory.NoResponse]: [PostCategory.PendingResponse],

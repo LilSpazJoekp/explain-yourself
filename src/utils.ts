@@ -15,8 +15,9 @@ import {
     PostCategory,
     TextFieldParams,
 } from "./_types.js";
-import { DEFAULT_RETRIES } from "./consts.js";
+import { DEFAULT_RETRIES, PrivateNote } from "./consts.js";
 import { PrefixLogger } from "./logger.js";
+import { PostData } from "./postData.js";
 
 export function numberField(params: FieldParams & NumberFieldParams): {
     label: string;
@@ -362,4 +363,27 @@ async function ensureWikiPage(
             content: "```json\n{}\n```",
         });
     }
+}
+
+export async function safeRemove(
+    reddit: RedditAPIClient,
+    postData: PostData,
+    log: PrefixLogger,
+): Promise<boolean> {
+    try {
+        await reddit.remove(postData.postId, false);
+        return true;
+    } catch (e) {
+        log.error("Failed to remove post %s: %s", postData.postId, e);
+        try {
+            await postData.leavePrivateModNote(PrivateNote.InsufficientPermissions);
+        } catch (e2) {
+            log.error(
+                "Failed to leave private mod note for post %s: %s",
+                postData.postId,
+                e2,
+            );
+        }
+    }
+    return false;
 }

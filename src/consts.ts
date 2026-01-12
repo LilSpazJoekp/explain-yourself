@@ -26,4 +26,5 @@ export enum PrivateNote {
     ModRemoved = "The post/comment was removed by a moderator. This can include removals for the following reasons:\n\n- a moderator (other than this bot) removed the post/comment\n- author failed to respond with an explanation within the required time\n- spam",
     Safe = "The post has marked as safe. It will no longer be monitored.",
     NoResponse = "The explanation request was not responded to by the author.",
+    InsufficientPermissions = "The bot lacks sufficient permissions to perform the desired action. Please ensure the app account has at least modmail and posts permissions.",
 }
