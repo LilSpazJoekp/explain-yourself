@@ -309,6 +309,10 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.4.4
+
+- Add retry for sending modmail messages to mitigate transient errors.
+
 ## 1.4.3
 
 - Improve handling of posts' status when actioned by AutoModerator or safety checks. This aims to hopefully resolve the

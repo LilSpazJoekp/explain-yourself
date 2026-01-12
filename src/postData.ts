@@ -612,14 +612,13 @@ export class PostData {
             return;
         }
         try {
-            await this.context.reddit.modMail.reply({
+            await withRetries(() => this.context.reddit.modMail.reply({
                 conversationId: this.sentModmailId,
                 body,
                 isAuthorHidden: true,
-            });
+            }));
         } catch (error) {
             this.log.error("Failed to send modmail reply", error);
-            return;
         }
         await this.#archiveConversationIfNotInternal(this.sentModmailId);
     }
