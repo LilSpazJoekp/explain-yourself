@@ -309,6 +309,11 @@ If you have any feedback or suggestions for BanHammer, file a bug report or feat
 
 ## Changes
 
+## 1.4.7
+
+- Fix an issue where a post could get stuck in limbo if it wasn't able to send a modmail message asking for an
+  explanation, but the post was still marked as pending explanation.
+
 ## 1.4.5
 
 - Fix an issue where a post would get stuck in a loop of being removed when no response was received.

@@ -121,7 +121,6 @@ async function handleApprove(
         allowExplanation,
         explanationPendingComment,
         ignoreModerators,
-        ignoreFilteredPosts,
     } = await resolveSettings(
         context.settings,
         "exclusionRegex",
@@ -131,7 +130,6 @@ async function handleApprove(
         "allowExplanation",
         "explanationPendingComment",
         "ignoreModerators",
-        "ignoreFilteredPosts",
     );
     let post;
     if (event.targetPost.id) {
@@ -184,7 +182,7 @@ async function handleApprove(
         log.info("Resetting post createdAt");
         postData.createdAt = new Date().valueOf();
         await postData.writeToRedis();
-        if (!postData.sentModmailId && ignoreFilteredPosts) {
+        if (!postData.sentModmailId) {
             // if we haven't sent modmail yet, re-initialize the post session
             const post = await context.reddit.getPostById(postData.postId);
             await postData.initializePostSession(

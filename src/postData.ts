@@ -218,7 +218,9 @@ export class PostData {
         }
         postData.log.injectArgs(postData.postId, ...additionalArgs);
         postData.author = await post.getAuthor();
-        postData.createdAt = post.createdAt.valueOf();
+        if (!postData.createdAt) {
+            postData.createdAt = post.createdAt.valueOf();
+        }
         postData.postId = post.id;
         postData.removed = post.removed;
         postData.post = post;
